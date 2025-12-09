@@ -1,176 +1,261 @@
-/* 悬浮球 (入口) */
+/* --- 1. 悬浮球 (入口) --- */
 #ow-phone-toggle {
     position: fixed;
     bottom: 30px;
     right: 30px;
-    width: 50px;
-    height: 50px;
-    background: linear-gradient(135deg, #007bff, #00d4ff);
+    width: 56px;
+    height: 56px;
+    /* 渐变蓝紫色，更有科技感 */
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     border-radius: 50%;
-    box-shadow: 0 4px 15px rgba(0, 123, 255, 0.4);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
     z-index: 20000;
     cursor: pointer;
     display: flex;
     justify-content: center;
     align-items: center;
-    font-size: 24px;
-    transition: transform 0.2s, box-shadow 0.2s;
+    font-size: 28px;
+    transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
     user-select: none;
 }
 #ow-phone-toggle:hover {
     transform: scale(1.1);
-    box-shadow: 0 6px 20px rgba(0, 123, 255, 0.6);
+}
+#ow-phone-toggle:active {
+    transform: scale(0.95);
 }
 
-/* 手机主面板 */
+/* --- 2. 手机主面板 (Glassmorphism) --- */
 #ow-phone-container {
     position: fixed;
-    bottom: 90px;
+    /* 默认位置，会被JS覆盖 */
+    bottom: 100px;
     right: 30px;
-    width: 320px;
-    height: 600px;
-    background: rgba(30, 30, 35, 0.85); /* 深色磨砂背景 */
-    backdrop-filter: blur(15px);
-    -webkit-backdrop-filter: blur(15px);
-    border: 1px solid rgba(255, 255, 255, 0.15);
+    width: 340px;
+    height: 650px;
+    /* 深色毛玻璃背景 */
+    background: rgba(20, 20, 25, 0.75);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 24px;
-    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
     z-index: 20001;
     display: flex;
     flex-direction: column;
     overflow: hidden;
     color: #fff;
-    font-family: 'Segoe UI', Roboto, sans-serif;
-    transition: opacity 0.2s, transform 0.2s;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    transition: opacity 0.25s ease, transform 0.25s ease;
     transform-origin: bottom right;
 }
 
-/* 隐藏状态 */
+/* 隐藏时的状态 */
 .ow-hidden {
     opacity: 0;
     pointer-events: none;
-    transform: scale(0.9);
+    transform: scale(0.9) translateY(20px);
 }
 
-/* 顶部标题栏 */
+/* --- 3. 顶部导航栏 --- */
 #ow-phone-header {
-    padding: 15px 20px;
-    background: rgba(255, 255, 255, 0.05);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    height: 60px;
+    padding: 0 15px;
+    background: rgba(255, 255, 255, 0.03);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
     display: flex;
-    justify-content: space-between;
     align-items: center;
-    cursor: move; /* 允许拖动 */
+    justify-content: space-between;
+    /* 关键：允许拖拽的区域 */
+    cursor: grab;
+    user-select: none;
 }
-#ow-header-title {
-    font-weight: 600;
-    font-size: 16px;
+#ow-phone-header:active {
+    cursor: grabbing;
 }
 
-/* 内容区域 */
+#ow-back-btn {
+    font-size: 20px;
+    padding: 5px 10px;
+    cursor: pointer;
+    color: rgba(255, 255, 255, 0.7);
+    transition: color 0.2s;
+}
+#ow-back-btn:hover { color: #fff; }
+
+#ow-header-title {
+    font-size: 17px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+}
+
+#ow-close-btn {
+    font-size: 20px;
+    padding: 5px;
+    cursor: pointer;
+    opacity: 0.6;
+}
+#ow-close-btn:hover { opacity: 1; }
+
+/* --- 4. 列表与内容区 --- */
 #ow-phone-body {
     flex: 1;
     overflow-y: auto;
-    padding: 0;
-    scrollbar-width: thin;
-    scrollbar-color: rgba(255,255,255,0.2) transparent;
+    position: relative;
 }
+/* 滚动条美化 */
+#ow-phone-body::-webkit-scrollbar { width: 4px; }
+#ow-phone-body::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 2px; }
 
 /* 联系人列表项 */
 .ow-contact-item {
-    padding: 15px 20px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-    cursor: pointer;
     display: flex;
-    justify-content: space-between;
     align-items: center;
+    padding: 12px 15px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+    cursor: pointer;
     transition: background 0.2s;
 }
 .ow-contact-item:hover {
-    background: rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.08);
 }
-.ow-contact-name {
-    font-size: 15px;
+
+.ow-avatar {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    background: linear-gradient(45deg, #aaa, #ddd); /* 默认占位 */
+    margin-right: 12px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-weight: bold;
+    color: #333;
+    font-size: 18px;
+    position: relative;
+    overflow: visible; /* 允许红点溢出 */
+}
+
+.ow-info {
+    flex: 1;
+    min-width: 0; /* 允许文本截断 */
+}
+.ow-name {
+    font-size: 16px;
     font-weight: 500;
+    margin-bottom: 4px;
 }
-.ow-contact-preview {
-    font-size: 12px;
+.ow-preview {
+    font-size: 13px;
     color: rgba(255, 255, 255, 0.5);
-    margin-top: 4px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    max-width: 180px;
 }
 
-/* 聊天气泡 */
+/* --- 5. 聊天界面 --- */
 .ow-chat-view {
     padding: 15px;
+    padding-bottom: 20px;
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 12px;
 }
+
 .ow-msg {
+    max-width: 75%;
     padding: 10px 14px;
     border-radius: 18px;
     font-size: 14px;
-    max-width: 80%;
-    line-height: 1.4;
-    word-break: break-word;
-}
-.ow-msg-left {
-    background: rgba(255, 255, 255, 0.1);
-    align-self: flex-start;
-    border-bottom-left-radius: 4px;
-}
-.ow-msg-right {
-    background: #007bff;
-    align-self: flex-end;
-    border-bottom-right-radius: 4px;
-    box-shadow: 0 2px 8px rgba(0, 123, 255, 0.3);
+    line-height: 1.45;
+    word-wrap: break-word;
+    position: relative;
 }
 
-/* 底部输入框 */
+.ow-msg-left {
+    background: rgba(255, 255, 255, 0.12);
+    align-self: flex-start;
+    border-bottom-left-radius: 4px;
+    color: #eee;
+}
+
+.ow-msg-right {
+    /* 发送方颜色：稍微深一点的蓝色 */
+    background: #3b82f6; 
+    align-self: flex-end;
+    border-bottom-right-radius: 4px;
+    color: #fff;
+}
+
+/* --- 6. 底部输入区 --- */
 #ow-input-area {
-    padding: 10px;
+    padding: 12px;
     background: rgba(0, 0, 0, 0.2);
+    backdrop-filter: blur(10px);
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
     display: flex;
-    gap: 8px;
+    gap: 10px;
     align-items: center;
 }
+
 #ow-input {
     flex: 1;
-    background: rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.08);
     border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 20px;
-    padding: 8px 15px;
+    padding: 10px 16px;
     color: white;
+    font-size: 14px;
     outline: none;
+    transition: background 0.2s;
 }
 #ow-input:focus {
     background: rgba(255, 255, 255, 0.15);
 }
+
 #ow-send-btn {
-    background: transparent;
+    background: #3b82f6;
+    color: white;
     border: none;
-    color: #007bff;
-    font-weight: bold;
+    border-radius: 50%;
+    width: 36px;
+    height: 36px;
     cursor: pointer;
-    padding: 5px 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    transition: background 0.2s;
+}
+#ow-send-btn:hover {
+    background: #2563eb;
 }
 
-/* 红点角标 */
+/* --- 7. 红点 --- */
 .ow-badge {
-    background-color: #ff3b30;
+    position: absolute;
+    top: -2px;
+    right: -2px;
+    background-color: #ef4444;
     color: white;
     border-radius: 10px;
-    padding: 2px 6px;
-    font-size: 11px;
-    font-weight: bold;
+    height: 16px;
     min-width: 16px;
-    text-align: center;
-    position: absolute;
-    top: -5px;
-    right: -5px;
-    border: 2px solid #333;
+    padding: 0 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    font-weight: bold;
+    border: 2px solid #222; /* 描边增强对比 */
+    box-sizing: content-box;
+}
+/* 主悬浮球的红点 */
+#ow-main-badge {
+    top: 0;
+    right: 0;
+    border: none;
+    height: 20px;
+    min-width: 20px;
+    font-size: 12px;
 }
