@@ -1,256 +1,295 @@
-// 简单的状态管理
-const PHONE_STATE = {
-    contacts: {}, // 存储格式: { "角色名": [{sender: "角色名", content: "内容", type: "recv"}] }
-    currentChat: null,
-    isVisible: false,
-    unreadCount: 0
-};
+(function () {
+    // === 核心状态 ===
+    const SETTING_KEY = "open_world_phone_data";
+    const State = {
+        contacts: {}, // { "姓名": { messages: [], unread: 0 } }
+        currentChat: null, // 当前正在和谁聊天
+        isOpen: false,
+        totalUnread: 0
+    };
 
-// 1. 初始化界面
-function initPhoneUI() {
-    // 注入主HTML结构
-    const html = `
-    <div id="ow-phone-toggle" title="打开手机">
-        📱<span id="ow-main-badge" class="ow-badge" style="display:none">0</span>
-    </div>
-    <div id="ow-phone-container" style="display:none">
-        <div id="ow-phone-header">
-            <span id="ow-header-title">通讯录</span>
-            <span id="ow-close-btn" style="cursor:pointer">✖</span>
+    // === 1. 初始化 & UI 渲染 ===
+    function init() {
+        // 加载保存的数据
+        loadData();
+
+        // 注入 HTML
+        const layout = `
+        <div id="ow-phone-toggle" title="查看手机">
+            📱<span id="ow-main-badge" class="ow-badge" style="display:none">0</span>
         </div>
-        <div id="ow-phone-body"></div>
-        <div id="ow-input-area" style="display:none">
-            <input id="ow-input" placeholder="发送讯息..." autocomplete="off">
-            <button id="ow-send-btn">发送</button>
+        <div id="ow-phone-container" class="ow-hidden">
+            <div id="ow-phone-header">
+                <span id="ow-back-btn" style="display:none; cursor:pointer; margin-right:10px">❮</span>
+                <span id="ow-header-title">通讯录</span>
+                <span id="ow-close-btn" style="cursor:pointer; margin-left:auto">✖</span>
+            </div>
+            <div id="ow-phone-body"></div>
+            <div id="ow-input-area" style="display:none">
+                <input id="ow-input" placeholder="输入短信..." autocomplete="off">
+                <button id="ow-send-btn">发送</button>
+            </div>
         </div>
-    </div>
-    `;
-    $('body').append(html);
+        <audio id="ow-notify-sound" src="/scripts/extensions/open_world_phone/notify.mp3" preload="auto"></audio>
+        `;
+        $('body').append(layout);
 
-    // 绑定事件：拖动
-    $("#ow-phone-container").draggable({ handle: "#ow-phone-header" });
-
-    // 绑定事件：显隐
-    $('#ow-phone-toggle').click(() => togglePhone(true));
-    $('#ow-close-btn').click(() => togglePhone(false));
-
-    // 绑定事件：返回通讯录
-    $('#ow-header-title').click(() => renderContactList());
-
-    // 绑定事件：发送消息
-    $('#ow-send-btn').click(handleUserSend);
-    $('#ow-input').keypress((e) => { if(e.which == 13) handleUserSend(); });
-
-    // 加载历史数据
-    loadPhoneData();
-}
-
-// 2. 核心逻辑：解析AI消息 (Hook)
-function parseIncomingMessage(text) {
-    // 匹配格式：[SMS: 角色名 | 内容]
-    const regex = /\[SMS:\s*(.+?)\s*\|\s*(.+?)\]/g;
-    let match;
-    let hasNewMsg = false;
-
-    while ((match = regex.exec(text)) !== null) {
-        const sender = match[1].trim();
-        const content = match[2].trim();
+        // 绑定事件
+        $('#ow-phone-toggle').click(() => togglePhone(true));
+        $('#ow-close-btn').click(() => togglePhone(false));
+        $('#ow-back-btn').click(renderContactList);
         
-        // 自动添加好友 & 存储消息
-        addMessage(sender, content, 'recv');
-        hasNewMsg = true;
+        // 使手机窗口可拖动 (依赖 JQuery UI)
+        $("#ow-phone-container").draggable({ 
+            handle: "#ow-phone-header",
+            containment: "window"
+        });
+
+        // 发送消息事件
+        $('#ow-send-btn').click(handleUserSend);
+        $('#ow-input').keypress((e) => { if (e.which == 13) handleUserSend(); });
+
+        // 监听酒馆消息 (核心 Hook)
+        // 这里的 context.eventSource 是酒馆接收消息的标准接口
+        if (window.eventSource) {
+            window.eventSource.on(tavern_events.MESSAGE_RECEIVED, (data) => {
+                // data 是最新生成的那条消息 ID，我们需要去读取内容
+                // 由于 event 触发时 DOM 可能还没渲染完，我们稍微延迟一下或直接读数据
+                setTimeout(() => checkLatestMessage(), 500); 
+            });
+        } else {
+            // 降级方案：MutationObserver 监听聊天框变化
+            const observer = new MutationObserver(checkLatestMessage);
+            const chatLog = document.querySelector('#chat');
+            if (chatLog) observer.observe(chatLog, { childList: true, subtree: true });
+        }
+
+        renderContactList();
     }
 
-    if (hasNewMsg) {
-        playSound();
-        updateBadge();
-        // 如果当前正好开着这个人的聊天框，刷新它
-        if (PHONE_STATE.isVisible && PHONE_STATE.currentChat) {
-            renderChatWindow(PHONE_STATE.currentChat);
-        } else if (PHONE_STATE.isVisible) {
-            renderContactList(); // 刷新通讯录看红点
+    // === 2. 逻辑：检查并解析消息 ===
+    function checkLatestMessage() {
+        // 获取最后一条消息的文本
+        const lastMsg = $('.mes_text').last().text();
+        if (!lastMsg) return;
+
+        // 正则 1: [SMS: 发信人 | 内容]
+        // 正则 2: [ADD_CONTACT: 名字]
+        const smsRegex = /\[SMS:\s*(.+?)\s*\|\s*(.+?)\]/g;
+        const addRegex = /\[ADD_CONTACT:\s*(.+?)\]/g;
+
+        let hasUpdate = false;
+
+        // 处理加好友
+        let addMatch;
+        while ((addMatch = addRegex.exec(lastMsg)) !== null) {
+            const name = addMatch[1].trim();
+            if (!State.contacts[name]) {
+                State.contacts[name] = { messages: [], unread: 0 };
+                toastr.success(`📱 自动添加新联系人: ${name}`);
+                hasUpdate = true;
+            }
+        }
+
+        // 处理短信
+        let smsMatch;
+        while ((smsMatch = smsRegex.exec(lastMsg)) !== null) {
+            const sender = smsMatch[1].trim();
+            const content = smsMatch[2].trim();
+            
+            // 如果是 {{user}} 发的消息（即我刚才发的），忽略，避免重复
+            if (sender === '我' || sender.toLowerCase() === 'user') continue;
+
+            addMessage(sender, content, 'recv');
+            hasUpdate = true;
+        }
+
+        if (hasUpdate) {
+            playSound();
+            saveData();
+            if (State.isOpen) {
+                if (State.currentChat) renderChatWindow(State.currentChat);
+                else renderContactList();
+            }
+            updateBadge();
         }
     }
-}
 
-// 3. 数据处理：添加消息
-function addMessage(contactName, content, type) {
-    if (!PHONE_STATE.contacts[contactName]) {
-        PHONE_STATE.contacts[contactName] = { messages: [], unread: 0 };
-        toastr.success(`📱 新联系人添加: ${contactName}`); // 系统通知
-    }
-    
-    PHONE_STATE.contacts[contactName].messages.push({
-        sender: type === 'recv' ? contactName : '我',
-        content: content,
-        type: type
-    });
-
-    if (type === 'recv' && PHONE_STATE.currentChat !== contactName) {
-        PHONE_STATE.contacts[contactName].unread++;
-        PHONE_STATE.unreadCount++;
-    }
-    
-    savePhoneData();
-}
-
-// 4. 用户发送消息 (Inject Logic)
-async function handleUserSend() {
-    const content = $('#ow-input').val();
-    const target = PHONE_STATE.currentChat;
-    if (!content || !target) return;
-
-    // 1. UI上显示
-    addMessage(target, content, 'sent');
-    $('#ow-input').val('');
-    renderChatWindow(target);
-
-    // 2. 【关键】注入到酒馆的聊天流中
-    // 我们构造一个系统指令，假装是环境描写，告诉AI用户发短信了
-    const systemPrompt = `\n[System: {{user}} just sent a text message to ${target}: "${content}". ${target} should reply via SMS format if they see it.]\n`;
-    
-    // 调用酒馆API发送（这里使用一种通用的注入方式，或者直接追加到输入框如果用户希望）
-    // 为了更无缝，我们直接作为"User Message"发送，但带上特定Wrapper
-    // 或者，更高级的做法是使用 '/send' 命令触发
-    
-    const textarea = document.getElementById('send_textarea');
-    if (textarea) {
-        const originalText = textarea.value;
-        // 强制触发一次生成，告诉AI我发消息了
-        // 注意：这里我们让AI知道发生了什么，但不强迫AI立刻描写场景，而是让它在后台处理
-        const injection = `[短信发送给 ${target}: "${content}"]`;
+    // === 3. 逻辑：添加消息到数据库 ===
+    function addMessage(name, content, type) {
+        if (!State.contacts[name]) {
+            State.contacts[name] = { messages: [], unread: 0 };
+        }
         
-        // 简单粗暴法：直接填入输入框并发送（你可以改为静默注入context）
-        textarea.value = injection;
-        // 触发发送按钮点击
-        document.getElementById('send_but').click(); 
+        State.contacts[name].messages.push({
+            type: type, // 'sent' or 'recv'
+            content: content,
+            time: new Date().getTime()
+        });
+
+        // 只有当这是接收消息，且当前没在看这个人的聊天窗时，增加未读
+        if (type === 'recv' && State.currentChat !== name) {
+            State.contacts[name].unread = (State.contacts[name].unread || 0) + 1;
+        }
     }
-}
 
-// 5. 渲染：通讯录
-function renderContactList() {
-    PHONE_STATE.currentChat = null;
-    $('#ow-header-title').text("通讯录 (点击进入)");
-    $('#ow-input-area').hide();
-    const list = $('#ow-phone-body');
-    list.empty();
+    // === 4. 逻辑：用户发送消息 (注入酒馆) ===
+    async function handleUserSend() {
+        const text = $('#ow-input').val().trim();
+        const target = State.currentChat;
+        if (!text || !target) return;
 
-    Object.keys(PHONE_STATE.contacts).forEach(name => {
-        const info = PHONE_STATE.contacts[name];
-        const unreadBadge = info.unread > 0 ? `<span style="color:red;margin-left:5px">(${info.unread})</span>` : '';
-        const item = $(`<div class="ow-contact-item"><span>${name}${unreadBadge}</span><span>></span></div>`);
-        item.click(() => renderChatWindow(name));
-        list.append(item);
-    });
-}
+        // 1. UI 上先显示
+        addMessage(target, text, 'sent');
+        $('#ow-input').val('');
+        renderChatWindow(target);
+        saveData();
 
-// 6. 渲染：聊天窗口
-function renderChatWindow(name) {
-    PHONE_STATE.currentChat = name;
-    // 清除未读
-    const diff = PHONE_STATE.contacts[name].unread;
-    PHONE_STATE.unreadCount -= diff;
-    PHONE_STATE.contacts[name].unread = 0;
-    updateBadge();
+        // 2. 构造注入文本
+        // 格式: [短信发送给 角色名: "内容"]
+        const injection = `\n[SMS: 我 | ${text}]\n(System: User sent a text to ${target}. ${target} should read it and reply using [SMS: ${target} | message] format if needed.)`;
 
-    $('#ow-header-title').html(`<span style="color:#aaa"><</span> ${name}`);
-    $('#ow-input-area').show();
-    
-    const list = $('#ow-phone-body');
-    list.empty();
-    
-    // 构建消息流
-    const msgs = PHONE_STATE.contacts[name].messages;
-    msgs.forEach(msg => {
-        const div = $(`<div class="ow-msg ${msg.type === 'recv' ? 'ow-msg-left' : 'ow-msg-right'}">${msg.content}</div>`);
-        list.append(div);
-    });
-    
-    // 滚动到底部
-    list.scrollTop(list[0].scrollHeight);
-}
-
-// 辅助功能
-function togglePhone(show) {
-    PHONE_STATE.isVisible = show;
-    if (show) {
-        $('#ow-phone-container').fadeIn(200);
-        $('#ow-phone-toggle').fadeOut(200);
-        if(!PHONE_STATE.currentChat) renderContactList();
-    } else {
-        $('#ow-phone-container').fadeOut(200);
-        $('#ow-phone-toggle').fadeIn(200);
+        // 3. 发送给酒馆
+        // 我们利用酒馆的 API 直接触发生成
+        // 如果是流式传输，最好直接追加到当前输入框并触发点击
+        const textarea = document.getElementById('send_textarea');
+        if (textarea) {
+            // 暂存用户可能正在输入的内容
+            const originalInput = textarea.value;
+            
+            // 填入我们的短信指令
+            textarea.value = injection;
+            
+            // 触发发送
+            document.getElementById('send_but').click();
+            
+            // 稍后（极短时间）如果想恢复用户之前的输入有点难，因为点击发送会清空。
+            // 所以这里直接作为一次交互发送出去是合理的。
+        }
     }
-}
 
-function updateBadge() {
-    const badge = $('#ow-main-badge');
-    if (PHONE_STATE.unreadCount > 0) {
-        badge.text(PHONE_STATE.unreadCount).show();
-    } else {
-        badge.hide();
+    // === 5. 渲染：通讯录 ===
+    function renderContactList() {
+        State.currentChat = null;
+        $('#ow-header-title').text("通讯录");
+        $('#ow-back-btn').hide();
+        $('#ow-input-area').hide();
+        const body = $('#ow-phone-body');
+        body.empty();
+
+        const names = Object.keys(State.contacts);
+        if (names.length === 0) {
+            body.append(`<div style="text-align:center; padding:20px; color:#888;">暂无联系人<br>在剧情中触发 [ADD_CONTACT:姓名] 即可添加</div>`);
+            return;
+        }
+
+        names.forEach(name => {
+            const data = State.contacts[name];
+            const lastMsgObj = data.messages[data.messages.length - 1];
+            const lastMsgText = lastMsgObj ? lastMsgObj.content : "暂无消息";
+            
+            const badgeHtml = data.unread > 0 ? `<div class="ow-badge" style="position:static; margin-left:10px">${data.unread}</div>` : '';
+
+            const item = $(`
+                <div class="ow-contact-item">
+                    <div style="flex:1; overflow:hidden;">
+                        <div class="ow-contact-name">${name}</div>
+                        <div class="ow-contact-preview">${lastMsgText}</div>
+                    </div>
+                    ${badgeHtml}
+                    <div style="color:#666">❯</div>
+                </div>
+            `);
+            
+            item.click(() => renderChatWindow(name));
+            body.append(item);
+        });
     }
-}
 
-function playSound() {
-    // 尝试播放同目录下的 notify.mp3
-    const audio = new Audio('/scripts/extensions/open_world_phone/notify.mp3');
-    audio.volume = 0.5;
-    audio.play().catch(e => console.log('声音播放失败，可能需要交互', e));
-}
+    // === 6. 渲染：聊天窗口 ===
+    function renderChatWindow(name) {
+        State.currentChat = name;
+        // 清除未读
+        if (State.contacts[name]) State.contacts[name].unread = 0;
+        updateBadge();
+        saveData();
 
-// 数据持久化 (保存到 extension_settings)
-function savePhoneData() {
-    if (window.extensionsAPI) {
-        // 酒馆的标准扩展API
-        // extensionsAPI.settings.save('open_world_phone', PHONE_STATE.contacts);
-        // 为了简单演示，这里先存 localStorage，生产环境建议用 extensionsAPI
-        localStorage.setItem('ow_phone_data', JSON.stringify(PHONE_STATE.contacts));
+        $('#ow-header-title').text(name);
+        $('#ow-back-btn').show();
+        $('#ow-input-area').css('display', 'flex'); // flex布局
+        const body = $('#ow-phone-body');
+        body.empty();
+
+        const view = $('<div class="ow-chat-view"></div>');
+        const msgs = State.contacts[name]?.messages || [];
+
+        msgs.forEach(msg => {
+            const el = $(`<div class="ow-msg ${msg.type === 'sent' ? 'ow-msg-right' : 'ow-msg-left'}">${msg.content}</div>`);
+            view.append(el);
+        });
+
+        body.append(view);
+        // 滚动到底部
+        body.scrollTop(body[0].scrollHeight);
     }
-}
 
-function loadPhoneData() {
-    const data = localStorage.getItem('ow_phone_data');
-    if (data) {
-        PHONE_STATE.contacts = JSON.parse(data);
-        // 重新计算未读
-        let count = 0;
-        Object.values(PHONE_STATE.contacts).forEach(c => count += c.unread || 0);
-        PHONE_STATE.unreadCount = count;
+    // === 工具函数 ===
+    function togglePhone(show) {
+        State.isOpen = show;
+        const container = $('#ow-phone-container');
+        const toggle = $('#ow-phone-toggle');
+        
+        if (show) {
+            container.removeClass('ow-hidden');
+            toggle.addClass('ow-hidden'); // 隐藏悬浮球
+            if (!State.currentChat) renderContactList();
+        } else {
+            container.addClass('ow-hidden');
+            toggle.removeClass('ow-hidden'); // 显示悬浮球
+        }
         updateBadge();
     }
-}
 
-// === 入口 ===
-jQuery(document).ready(function () {
-    initPhoneUI();
-
-    // 监听酒馆的消息接收事件
-    // 注意：SillyTavern 的事件系统通常是通过 eventSource 或 mutationObserver
-    // 这里使用最通用的 extensionAPI 如果可用，或者监听 socket
-    
-    // 这是一个简化的 Hook，实际在酒馆里建议使用 extensionAPI.event.on('message_received', ...)
-    // 为了确保你能用，我们用一个更底层的 MutationObserver 监听聊天区域的变化
-    
-    const observer = new MutationObserver((mutations) => {
-        mutations.forEach((mutation) => {
-            if (mutation.addedNodes.length) {
-                $(mutation.addedNodes).each(function() {
-                    // 检查是否是新消息 div
-                    if ($(this).hasClass('mes')) { 
-                        const text = $(this).find('.mes_text').text();
-                        // 1. 解析消息
-                        parseIncomingMessage(text);
-                        // 2. 可选：隐藏掉消息里的 [SMS] 标签，保持界面整洁
-                        // (这需要更复杂的DOM操作，暂时略过，为了完美可以加)
-                    }
-                });
-            }
-        });
-    });
-
-    const chatContainer = document.getElementById('chat');
-    if (chatContainer) {
-        observer.observe(chatContainer, { childList: true, subtree: true });
+    function updateBadge() {
+        let total = 0;
+        Object.values(State.contacts).forEach(c => total += (c.unread || 0));
+        const badge = $('#ow-main-badge');
+        if (total > 0) {
+            badge.text(total).show();
+        } else {
+            badge.hide();
+        }
     }
-});
+
+    function playSound() {
+        const audio = document.getElementById('ow-notify-sound');
+        if (audio) {
+            audio.volume = 0.5;
+            audio.play().catch(e => console.log('声音播放被拦截:', e));
+        }
+    }
+
+    function saveData() {
+        // 使用酒馆自带的 settings 保存机制 (如果有) 或者 localStorage
+        // 为了通用性，这里使用 localStorage 并加上扩展名作为前缀
+        localStorage.setItem(SETTING_KEY, JSON.stringify(State.contacts));
+    }
+
+    function loadData() {
+        const raw = localStorage.getItem(SETTING_KEY);
+        if (raw) {
+            try {
+                State.contacts = JSON.parse(raw);
+            } catch(e) {
+                console.error("加载手机数据失败", e);
+            }
+        }
+        updateBadge();
+    }
+
+    // 启动!
+    $(document).ready(() => {
+        // 延迟一点加载，确保酒馆核心已就绪
+        setTimeout(init, 1000);
+    });
+})();
