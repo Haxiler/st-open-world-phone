@@ -1,13 +1,80 @@
 (function () {
     const STORAGE_PREFIX = "ow_phone_v3_";
-    let EMOJI_DB = []; 
-    let lastProcessedContent = "";
     
-    // --- 调试日志工具 ---
+    // --- 调试日志工具 (保留，便于验证功能) ---
     function debugLog(step, message, data = null) {
         const time = new Date().toLocaleTimeString();
         console.log(`%c[${time}] [OW调试-步骤${step}] ${message}`, "color: #ff00ff; font-weight: bold;", data || "");
     }
+    
+    // --- 1. 表情包数据 (直接硬编码到 JS 文件中) ---
+    const EMOJI_DB = [
+        // --- 基础互动 ---
+        { label: "打招呼", url: "https://sharkpan.xyz/f/LgwT7/AC229A80203166B292155ADA057DE423_0.gif" },
+        { label: "开心", url: "https://sharkpan.xyz/f/aVwtY/0CBEE9105C7A98E0E6162A79CCD09EFA_0.gif" },
+        { label: "爱心", url: "https://sharkpan.xyz/f/53nhj/345FFC998474F46C1A40B1567335DA03_0.gif" },
+        { label: "给你爱", url: "https://files.catbox.moe/sqa7c9.jpg" },
+        { label: "好的", url: "https://files.catbox.moe/71kn5e.png" },
+        { label: "晚安", url: "https://files.catbox.moe/duzx7n.png" },
+
+        // --- 卖萌/撒娇 ---
+        { label: "乖巧", url: "https://files.catbox.moe/4dnzcq.png" },
+        { label: "害羞", url: "https://files.catbox.moe/ssgpgy.jpg" },
+        { label: "飞奔", url: "https://sharkpan.xyz/f/kDOi6/0A231BF0BFAB3C2B243F9749B64F7444_0.gif" },
+        { label: "蹭蹭", url: "https://files.catbox.moe/9p0x2t.png" },
+        { label: "期待", url: "https://files.catbox.moe/i0ov5h.png" },
+        { label: "送花", url: "https://files.catbox.moe/s1t2kd.jpg" },
+        { label: "可怜", url: "https://sharkpan.xyz/f/XgmcW/817B66DAB2414E1FC8D717570A602193_0.gif" },
+        { label: "流口水", url: "https://sharkpan.xyz/f/j36f6/3010464DF8BD77B4A99AB23730F2EE57_0.gif" },
+
+        // --- 负面情绪/拒绝 ---
+        { label: "哭哭", url: "https://files.catbox.moe/rw1cfk.png" },
+        { label: "大哭", url: "https://files.catbox.moe/dbyrdf.png" },
+        { label: "委屈", url: "https://sharkpan.xyz/f/gVySw/D90D0B53802301FCDB1F0718DEB08C79_0.gif" },
+        { label: "生气", url: "https://files.catbox.moe/si6f0k.png" },
+        { label: "不爽", url: "https://files.catbox.moe/amelbv.png" },
+        { label: "嫌弃", url: "https://files.catbox.moe/t2e0nt.png" },
+        { label: "无语", url: "https://files.catbox.moe/wgkwjh.png" },
+        { label: "拒绝", url: "https://files.catbox.moe/bos6mn.jpg" },
+        { label: "心碎", url: "https://files.catbox.moe/ueqlfe.jpg" },
+        { label: "压力", url: "https://files.catbox.moe/ufz3ek.jpg" },
+
+        // --- 攻击性/怼人 ---
+        { label: "顶嘴", url: "https://sharkpan.xyz/f/vVBtL/mmexport1737057690899.png" },
+        { label: "揍你", url: "https://sharkpan.xyz/f/oJ1i4/mmexport1737057862640.gif" },
+        { label: "撞飞", url: "https://sharkpan.xyz/f/zMZu5/mmexport1737057848709.gif" },
+        { label: "锁喉", url: "https://files.catbox.moe/mi8tk3.jpg" },
+        { label: "滚", url: "https://sharkpan.xyz/f/1vAc2/mmexport1737057678306.png" },
+        { label: "比中指", url: "https://files.catbox.moe/umpgjb.jpg" },
+        { label: "吃屎", url: "https://files.catbox.moe/r26gox.png" },
+        { label: "你是坏蛋", url: "https://sharkpan.xyz/f/8r2Sj/mmexport1737057726579.png" },
+        { label: "我恨你", url: "https://files.catbox.moe/r6g32h.png" },
+
+        // --- 搞笑/发疯/阴阳怪气 ---
+        { label: "疑惑", url: "https://files.catbox.moe/gofdox.jpg" },
+        { label: "震惊", url: "https://files.catbox.moe/q7683x.png" },
+        { label: "尴尬", url: "https://files.catbox.moe/8eaawd.png" },
+        { label: "偷看", url: "https://files.catbox.moe/72wkme.png" },
+        { label: "发疯", url: "https://files.catbox.moe/8cqr43.jpg" },
+        { label: "已老实", url: "https://files.catbox.moe/6eyzlg.png" },
+        { label: "喝茶", url: "https://files.catbox.moe/1xvrb8.jpg" }, // 大人请用茶
+        { label: "免礼", url: "https://sharkpan.xyz/f/pO6uQ/mmexport1737057701883.png" },
+        { label: "满意", url: "https://sharkpan.xyz/f/e8KUw/mmexport1737057664689.png" },
+        { label: "好困", url: "https://files.catbox.moe/7pncr1.jpg" },
+        { label: "躺平", url: "https://files.catbox.moe/cq6ipd.png" },
+        { label: "升天", url: "https://files.catbox.moe/o8td90.png" },
+        { label: "大脑短路", url: "https://files.catbox.moe/d41e2q.png" },
+        { label: "吃瓜", url: "https://files.catbox.moe/428w1c.png" }, // 围观
+        { label: "吐魂", url: "https://files.catbox.moe/7yejey.png" },
+
+        // --- 特殊类 ---
+        { label: "我是狗", url: "https://files.catbox.moe/1bki7o.jpg" },
+        { label: "汪", url: "https://files.catbox.moe/iwmiww.jpg" },
+        { label: "投降", url: "https://files.catbox.moe/f4ogyw.png" }
+    ];
+
+    // 用于去重，记录最后一次处理的消息文本
+    let lastProcessedContent = "";
 
     const State = {
         contacts: {}, 
@@ -18,7 +85,7 @@
         currentChatFileId: null,
     };
 
-    // --- 辅助函数 (前置定义，防止 ReferenceError) ---
+    // --- 辅助函数 (防止 ReferenceError) ---
     function updateMainBadge() {
         let total = 0;
         Object.values(State.contacts).forEach(c => total += (c.unread || 0));
@@ -37,31 +104,76 @@
             localStorage.setItem(STORAGE_PREFIX + State.currentChatFileId, JSON.stringify(State.contacts));
         }
     }
+    
+    function loadData() {
+        State.contacts = {}; 
+        if (State.currentChatFileId) {
+            const raw = localStorage.getItem(STORAGE_PREFIX + State.currentChatFileId);
+            if(raw) {
+                try {
+                    State.contacts = JSON.parse(raw);
+                } catch(e) {
+                    console.error("数据解析失败", e);
+                }
+            }
+        }
+        updateMainBadge();
+    }
 
     function checkIsUser(name) {
         return (name === State.userName || name === '我' || name.toLowerCase() === 'user' || name === 'User' || name === '{{user}}');
     }
 
-    // --- 主初始化流程 ---
-// --- 辅助函数 (保持不变，确保它们定义在 init 之前或之后) ---
-    // ... (updateMainBadge, getRandomColor, saveData, checkIsUser 等函数应保留在 init 之外) ...
+    function parseEmojiContent(text) {
+        const bqbMatch = text.match(/\[(?:bqb-|表情:)\s*(.+?)\]/);
+        if (bqbMatch) {
+            const label = bqbMatch[1].trim();
+            const found = EMOJI_DB.find(e => e.label === label);
+            if (found) return `<img src="${found.url}" class="ow-msg-img">`;
+            return `[表情: ${label}]`;
+        }
+        return text;
+    }
+
+    // --- 核心消息读取逻辑 (优化版) ---
+    function checkLatestMessage() {
+        if (!window.SillyTavern || !window.SillyTavern.getContext) return;
+        const context = window.SillyTavern.getContext();
+        const chat = context.chat;
+        
+        if (chat && chat.length > 0) {
+            const lastMsg = chat[chat.length - 1];
+            // 确保获取的是原始消息体 (.mes)，它不会被“格式显示”的正则修改
+            const rawContent = lastMsg.mes; 
+            
+            // 调试输出原始数据，用于排查
+            debugLog(3, "检查最新消息内容", rawContent);
+            
+            if (rawContent === lastProcessedContent) return;
+            lastProcessedContent = rawContent;
+
+            if (rawContent.includes('<msg>')) {
+                debugLog(4, "发现手机指令，开始解析");
+                parseCommand(rawContent);
+            }
+        }
+    }
     
-    // --- 主初始化流程 (最终修复版) ---
+    function reprocessAllMessages() {
+        debugLog(7, "重新扫描所有消息 (触发检查)");
+        // 在实际应用中，我们只需要触发最新的消息检查，因为它包含了所有最新的指令
+        checkLatestMessage(); 
+    }
+
+
+    // --- 主初始化流程 (整合了所有修复) ---
     function init() {
         debugLog(0, "插件正在初始化...");
         
-        // 尝试加载表情包
-        $.getJSON('/extensions/open_world_phone/emojis.json', function(data) {
-            debugLog(0.5, "表情包加载成功");
-            EMOJI_DB = data;
-            if ($('#ow-emoji-panel').is(':visible')) renderEmojiPanel();
-        }).fail(function() {
-             console.error("【严重】找不到表情包文件！请确认文件夹名为 open_world_phone");
-        });
-
+        // 1. 初始化绑定
         updateContextInfo();
         
-        // 注入 UI (保持不变)
+        // 2. 注入 UI
         const layout = `
         <div id="ow-phone-toggle" title="打开手机">
             💬<span id="ow-main-badge" class="ow-badge" style="display:none">0</span>
@@ -86,30 +198,30 @@
         `;
         if ($('#ow-phone-container').length === 0) {
             $('body').append(layout);
+            renderEmojiPanel();
             bindEvents();
         }
 
-        // 核心修复：使用 Baibai 的多事件监听策略 (假设 getChatMessages/eventOn 可用)
-        // 这些事件确保在任何可能改变聊天内容的情况下，都触发消息检查。
-        if (window.eventOn && window.tavern_events && window.getChatMessages) {
-            debugLog(1, "挂载柏柏式多事件监听器...");
+        // 3. 【核心修复】使用多事件监听策略，实现沉浸式（无视正则隐藏）接收
+        if (window.eventOn && window.tavern_events) {
+            debugLog(1, "已挂载 SillyTavern 事件监听器。");
             
             // 消息渲染完成 (NPC消息进入 DOM 的最佳时机)
             eventOn(tavern_events.CHARACTER_MESSAGE_RENDERED, () => {
                 debugLog(2, "收到 'CHARACTER_MESSAGE_RENDERED' 事件");
-                setTimeout(checkLatestMessage, 50); // 微延迟，确保 context 已更新
+                setTimeout(checkLatestMessage, 50); 
             });
             
-            // 消息生成完成 (用户点击发送/AI开始或结束生成)
+            // 消息生成完成 (AI生成完毕)
             eventOn(tavern_events.GENERATION_ENDED, () => {
                 debugLog(2, "收到 'GENERATION_ENDED' 事件");
-                setTimeout(checkLatestMessage, 50); // 微延迟，确保 context 已更新
+                setTimeout(checkLatestMessage, 50); 
             });
             
             // 消息更新 (用户编辑/删除/重发)
             eventOn(tavern_events.MESSAGE_UPDATED, () => {
                 debugLog(2, "收到 'MESSAGE_UPDATED' 事件");
-                // 消息更新可能发生在历史记录中，所以需要重新扫描
+                // 更新时需要重新扫描，因为我们不确定是哪条消息被更新了
                 reprocessAllMessages();
             });
             
@@ -118,83 +230,22 @@
                 debugLog(2, "收到 'CHAT_CHANGED' 事件");
                 reprocessAllMessages();
             });
-
         } else {
-            console.warn("【警告】未检测到 eventOn/tavern_events API。手机自动接收消息功能可能无法工作。");
-            // 降级使用 V4.0 的旧逻辑，并希望有效（但已知这很可能失败）
-            if (window.eventSource) {
-                 window.eventSource.on('generation_ended', function() {
-                    debugLog(2, "退回到旧的 'generation_ended' 监听");
-                    setTimeout(checkLatestMessage, 500);
-                });
-            }
+             console.warn("【警告】未检测到 eventOn/tavern_events API。手机自动接收消息功能可能无法工作。");
         }
         
-        // 第一次加载时主动扫描一次
-        reprocessAllMessages();
+        renderContactList();
     }
 
-    // --- 新增辅助函数：重新处理所有消息 ---
-    async function reprocessAllMessages() {
-        debugLog(7, "重新扫描所有消息");
-        // 这里需要更精细地扫描所有消息，而不是只看最后一条。
-        // 但为了最小改动，我们只触发一次最新的消息检查。
-        // Baibai 的 Vo() 函数是重新加载并解析所有楼层，那是终极方案。
-        // 我们先保证最新的能收到。
-        checkLatestMessage();
-    }
 
-    // --- 修正后的 checkLatestMessage 函数 (确保它能读到原始数据) ---
-    function checkLatestMessage() {
-        if (!window.SillyTavern || !window.SillyTavern.getContext) return;
-        const context = window.SillyTavern.getContext();
-        const chat = context.chat;
-        
-        if (chat && chat.length > 0) {
-            const lastMsg = chat[chat.length - 1];
-            // 确保获取的是原始消息体 (.mes)，它不会被“格式显示”的正则修改
-            const rawContent = lastMsg.mes; 
-            
-            if (rawContent === lastProcessedContent) return;
-            lastProcessedContent = rawContent;
-            
-            debugLog(3, "检查最新消息内容", rawContent);
-
-            if (rawContent.includes('<msg>')) {
-                debugLog(4, "发现手机指令，开始解析");
-                parseCommand(rawContent);
-            }
-        }
-    }
-    
-    // ... (其他函数保持不变) ...
-
-    // --- 核心消息读取逻辑 ---
-    function checkLatestMessage() {
-        if (!window.SillyTavern || !window.SillyTavern.getContext) return;
-        
-        const context = window.SillyTavern.getContext();
-        const chat = context.chat;
-        
-        if (chat && chat.length > 0) {
-            const lastMsg = chat[chat.length - 1];
-            const rawContent = lastMsg.mes; // 获取原始文本，无视正则隐藏
-            
-            if (rawContent === lastProcessedContent) return;
-            lastProcessedContent = rawContent;
-            
-            debugLog(3, "检查最新消息内容", rawContent);
-
-            if (rawContent.includes('<msg>')) {
-                debugLog(4, "发现手机指令，开始解析");
-                parseCommand(rawContent);
-            }
-        }
-    }
-
+    // === 核心解析器 (保持不变) ===
     function parseCommand(text) {
         if (!text) return;
+        
+        // 解码 HTML 实体 (防止 &lt; 导致正则失败)
         const decodedText = text.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+
+        // 正则匹配: <msg>发送|接收|内容|时间</msg>
         const msgRegex = /<msg>(.+?)\|(.+?)\|(.+?)\|(.+?)<\/msg>/g;
         let match;
         
@@ -206,20 +257,25 @@
 
             debugLog(5, `解析成功: ${sender} -> ${receiver}`);
 
+            // === A. 处理加好友 (System 指令) ===
             if (sender.toLowerCase() === 'system' && content.startsWith('ADD:')) {
                 const newContactName = content.replace('ADD:', '').trim();
                 if (!State.contacts[newContactName]) {
                     State.contacts[newContactName] = { messages: [], unread: 0, color: getRandomColor() };
+                    saveData();
+                    toastr.success(`📱 自动添加好友: ${newContactName}`);
+                    if(State.isOpen && !State.currentChat) renderContactList();
                 }
-                saveData();
-                if(State.isOpen && !State.currentChat) renderContactList();
                 continue;
             }
 
+            // === B. 处理普通消息 ===
             const isSenderUser = checkIsUser(sender);
             const isReceiverUser = checkIsUser(receiver);
+
             content = parseEmojiContent(content);
 
+            // 别人发给我 (存为 recv)
             if (!isSenderUser && isReceiverUser) {
                 if (!State.contacts[sender]) {
                     State.contacts[sender] = { messages: [], unread: 0, color: getRandomColor() };
@@ -227,6 +283,7 @@
                 }
                 addMessageLocal(sender, content, 'recv', timeStr);
             }
+            // 我发给别人 (存为 sent)
             else if (isSenderUser && !isReceiverUser) {
                 if (!State.contacts[receiver]) {
                     State.contacts[receiver] = { messages: [], unread: 0, color: getRandomColor() };
@@ -237,54 +294,107 @@
         }
     }
 
+
+    // === 发送与数据存储逻辑 (保持不变) ===
+    function handleUserSend() {
+        const input = document.getElementById('ow-input');
+        const text = input.value.trim();
+        const target = State.currentChat; 
+        if (!text || !target) return;
+
+        const now = new Date();
+        const timeStr = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+
+        addMessageLocal(target, text, 'sent', timeStr);
+        input.value = '';
+
+        // 构造指令，并发送到主输入框
+        const command = `\n<msg>{{user}}|${target}|${text}|${timeStr}</msg>`;
+        appendToMainInput(command);
+    }
+
+    function sendEmoji(item) {
+        const target = State.currentChat;
+        if (!target) return;
+        const now = new Date();
+        const timeStr = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+        const imgHtml = `<img src="${item.url}" class="ow-msg-img">`;
+        addMessageLocal(target, imgHtml, 'sent', timeStr);
+        $('#ow-emoji-panel').hide();
+        const command = `\n<msg>{{user}}|${target}|[bqb-${item.label}]|${timeStr}</msg>`;
+        appendToMainInput(command);
+    }
+
+    function appendToMainInput(text) {
+        const textarea = document.getElementById('send_textarea');
+        if (!textarea) return;
+        let currentVal = textarea.value;
+        if (currentVal.length > 0 && !currentVal.endsWith('\n')) currentVal += '\n';
+        textarea.value = currentVal + text;
+        textarea.dispatchEvent(new Event('input', { bubbles: true }));
+        textarea.focus();
+    }
+
     function addMessageLocal(name, content, type, timeStr) {
         if (!State.contacts[name]) {
             State.contacts[name] = { messages: [], unread: 0, color: getRandomColor() };
         }
+        
         const msgs = State.contacts[name].messages;
         const lastMsg = msgs[msgs.length - 1];
-        
-        // 简单防抖
+
+        // 3秒防抖
         if (lastMsg && lastMsg.content === content && lastMsg.type === type) {
             if (Date.now() - (lastMsg.realTime || 0) < 3000) return;
         }
-        
-        msgs.push({ type, content, displayTime: timeStr || "刚刚", realTime: Date.now() });
-        if (type === 'recv' && State.currentChat !== name) State.contacts[name].unread++;
+
+        msgs.push({ 
+            type: type, 
+            content: content, 
+            displayTime: timeStr || "刚刚",
+            realTime: Date.now() 
+        });
+
+        if (type === 'recv' && State.currentChat !== name) {
+            State.contacts[name].unread++;
+        }
         
         saveData();
-        updateMainBadge(); // 这里不会再报错了
+        updateMainBadge();
+        
         if (State.isOpen) {
             if (State.currentChat === name) renderChat(name);
             else if (!State.currentChat) renderContactList();
         }
+        debugLog(6, "消息已写入 UI", {name, type});
     }
 
-    // --- UI 渲染与交互 ---
+    function deleteMessage(contactName, index) {
+        if (!State.contacts[contactName]) return;
+        State.contacts[contactName].messages.splice(index, 1);
+        saveData();
+        renderChat(contactName);
+        toastr.success("消息已删除");
+    }
+
+    // === UI 渲染函数 (包含增量渲染优化) ===
+    
     function updateContextInfo() {
         if (!window.SillyTavern || !window.SillyTavern.getContext) return;
+        
         const context = window.SillyTavern.getContext();
+        
         if (context.name) State.userName = context.name;
         else if (context.user_name) State.userName = context.user_name;
 
         const newFileId = context.chatId || context.characterId;
+
         if (newFileId && newFileId !== State.currentChatFileId) {
             State.currentChatFileId = newFileId;
             State.contacts = {}; 
             loadData(); 
             renderContactList();
         }
-    }
-
-    function loadData() {
-        State.contacts = {}; 
-        if (State.currentChatFileId) {
-            const raw = localStorage.getItem(STORAGE_PREFIX + State.currentChatFileId);
-            if(raw) {
-                try { State.contacts = JSON.parse(raw); } catch(e) {}
-            }
-        }
-        updateMainBadge();
     }
 
     function bindEvents() {
@@ -386,6 +496,7 @@
         });
     }
 
+    // 增量渲染函数（性能优化）
     function renderChat(name) {
         State.currentChat = name;
         if(State.contacts[name]) State.contacts[name].unread = 0;
@@ -399,24 +510,38 @@
         $('#ow-emoji-panel').hide();
 
         const body = $('#ow-phone-body');
+        
+        // 查找是否已经存在当前聊天的视图
         let view = body.find(`.ow-chat-view[data-chat-id="${name}"]`);
+        
         const msgs = State.contacts[name]?.messages || [];
         
+        // 如果视图不存在，或者当前视图属于另一个人，则完全重绘
         if (view.length === 0) {
             body.empty();
             view = $(`<div class="ow-chat-view" data-chat-id="${name}"></div>`);
             body.append(view);
+            
+            // 首次渲染：添加所有消息
             msgs.forEach((msg, index) => {
                 appendMsgToView(view, msg, name, index);
             });
+            // 滚动到底部
             body[0].scrollTop = body[0].scrollHeight;
         } else {
+            // 增量渲染：只添加新消息
             const currentCount = view.children().length;
             const targetCount = msgs.length;
+
             if (targetCount > currentCount) {
-                for (let i = currentCount; i < targetCount; i++) { appendMsgToView(view, msgs[i], name, i); }
+                // 有新消息 -> 追加
+                for (let i = currentCount; i < targetCount; i++) {
+                    appendMsgToView(view, msgs[i], name, i);
+                }
+                // 平滑滚动到底部
                 body.animate({ scrollTop: body[0].scrollHeight }, 300);
             } else if (targetCount < currentCount) {
+                // 消息减少了（删除了消息）-> 强制重绘
                 body.empty();
                 renderChat(name); 
                 return;
@@ -424,6 +549,7 @@
         }
     }
 
+    // 辅助函数：生成单条消息 DOM
     function appendMsgToView(viewContainer, msg, contactName, index) {
         const isMe = msg.type === 'sent';
         const div = $(`
@@ -432,57 +558,24 @@
                 <div style="font-size:10px; color:#888; margin-top:2px;">${msg.displayTime || ''}</div>
             </div>
         `);
+        
+        // 绑定右键删除事件
         div.find('.ow-msg').on('contextmenu', (e) => {
             e.preventDefault();
             if(confirm("删除这条消息？")) deleteMessage(contactName, index);
         });
+        
         viewContainer.append(div);
     }
 
-    function parseEmojiContent(text) {
-        const bqbMatch = text.match(/\[(?:bqb-|表情:)\s*(.+?)\]/);
-        if (bqbMatch) {
-            const label = bqbMatch[1].trim();
-            const found = EMOJI_DB.find(e => e.label === label);
-            if (found) return `<img src="${found.url}" class="ow-msg-img">`;
-            return `[表情: ${label}]`;
-        }
-        return text;
-    }
-
-    function handleUserSend() {
-        const input = document.getElementById('ow-input');
-        const text = input.value.trim();
-        const target = State.currentChat; 
-        if (!text || !target) return;
-        const now = new Date();
-        const timeStr = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
-        addMessageLocal(target, text, 'sent', timeStr);
-        input.value = '';
-        const command = `\n<msg>{{user}}|${target}|${text}|${timeStr}</msg>`;
-        appendToMainInput(command);
-    }
-
-    function sendEmoji(item) {
-        const target = State.currentChat;
-        if (!target) return;
-        const now = new Date();
-        const timeStr = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
-        const imgHtml = `<img src="${item.url}" class="ow-msg-img">`;
-        addMessageLocal(target, imgHtml, 'sent', timeStr);
-        $('#ow-emoji-panel').hide();
-        const command = `\n<msg>{{user}}|${target}|[bqb-${item.label}]|${timeStr}</msg>`;
-        appendToMainInput(command);
-    }
-
-    function appendToMainInput(text) {
-        const textarea = document.getElementById('send_textarea');
-        if (!textarea) return;
-        let currentVal = textarea.value;
-        if (currentVal.length > 0 && !currentVal.endsWith('\n')) currentVal += '\n';
-        textarea.value = currentVal + text;
-        textarea.dispatchEvent(new Event('input', { bubbles: true }));
-        textarea.focus();
+    function renderEmojiPanel() {
+        const panel = $('#ow-emoji-panel');
+        panel.empty();
+        EMOJI_DB.forEach(item => {
+            const img = $(`<img src="${item.url}" class="ow-emoji-item" title="${item.label}">`);
+            img.click(() => sendEmoji(item)); 
+            panel.append(img);
+        });
     }
 
     $(document).ready(() => setTimeout(init, 500));
