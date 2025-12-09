@@ -1,8 +1,10 @@
 (function () {
     const STORAGE_PREFIX = "ow_phone_v3_";
     
-    // 优化1：表情包变量改为空数组，改为异步加载
+    // 异步加载的表情包容器
     let EMOJI_DB = []; 
+    // 用于去重，记录最后一次处理的消息文本或ID
+    let lastProcessedContent = "";
 
     const State = {
         contacts: {}, 
@@ -14,24 +16,21 @@
     };
 
     function init() {
-        console.log("[OW Phone] Init v3.3 - Optimized Version");
+        console.log("[OW Phone] Init v4.0 - Immersion Mode (Data Stream)");
         
-        // 优化1：异步加载表情包 json
-        // 注意：确保 emojis.json 文件在插件目录下，且 manifest.json 的 name 为 open_world_phone
+        // 1. 加载表情包
         $.getJSON('/extensions/open_world_phone/emojis.json', function(data) {
             console.log("[OW Phone] 表情包加载成功");
             EMOJI_DB = data;
-            // 如果手机面板正开着，刷新一下表情面板
-            if ($('#ow-emoji-panel').is(':visible')) {
-                renderEmojiPanel();
-            }
+            if ($('#ow-emoji-panel').is(':visible')) renderEmojiPanel();
         }).fail(function() {
-            console.error("[OW Phone] 表情包加载失败，请检查 /extensions/open_world_phone/emojis.json 路径是否正确");
+            console.error("[OW Phone] 表情包加载失败，请检查路径");
         });
 
+        // 2. 初始化环境
         updateContextInfo();
         
-        // 注入 UI
+        // 3. 注入 UI (保持不变)
         const layout = `
         <div id="ow-phone-toggle" title="打开手机">
             💬<span id="ow-main-badge" class="ow-badge" style="display:none">0</span>
@@ -56,41 +55,57 @@
         `;
         if ($('#ow-phone-container').length === 0) {
             $('body').append(layout);
-            // renderEmojiPanel(); // 这里先不渲染，等 JSON 加载完
             bindEvents();
         }
 
-        // 启动监听 (专门抓取 .ow-raw-data)
-        const observer = new MutationObserver((mutations) => {
-            updateContextInfo();
-            mutations.forEach(mutation => {
-                if (mutation.addedNodes.length) {
-                    $(mutation.addedNodes).each(function() {
-                        const capsule = $(this).find('.ow-raw-data');
-                        if (capsule.length > 0) {
-                            capsule.each(function() {
-                                const rawMsg = $(this).attr('data-raw');
-                                console.log("[OW Phone] 捕捉到胶囊:", rawMsg);
-                                parseCommand(rawMsg);
-                            });
-                        }
-                        if ($(this).hasClass('ow-raw-data')) {
-                            const rawMsg = $(this).attr('data-raw');
-                            console.log("[OW Phone] 捕捉到胶囊(自身):", rawMsg);
-                            parseCommand(rawMsg);
-                        }
-                    });
-                }
+        // 4. 【核心修改】监听系统事件，而非 DOM 变化
+        // 这样即使正则隐藏了文本，我们也能从 eventSource 或 context 中读到原始数据
+        if (window.eventSource) {
+            // 当 AI 生成完毕时触发
+            window.eventSource.on('generation_ended', function() {
+                console.log("[OW Phone] 捕捉到生成结束事件，正在扫描后台数据...");
+                checkLatestMessage();
             });
-        });
-
-        const chatLog = document.getElementById('chat');
-        if (chatLog) observer.observe(chatLog, { childList: true, subtree: true });
+            
+            // 当切换聊天/群组时触发
+            window.eventSource.on('chat_id_changed', function() {
+                updateContextInfo();
+            });
+        } else {
+            console.error("[OW Phone] 致命错误：未检测到 window.eventSource，插件可能无法正常工作。");
+        }
         
         renderContactList();
     }
 
-    // === 核心功能函数 ===
+    // === 新的核心读取逻辑 ===
+    function checkLatestMessage() {
+        if (!window.SillyTavern || !window.SillyTavern.getContext) return;
+        
+        const context = window.SillyTavern.getContext();
+        // 获取聊天记录数组
+        const chat = context.chat;
+        
+        if (chat && chat.length > 0) {
+            // 获取最新的一条消息
+            const lastMsg = chat[chat.length - 1];
+            
+            // 获取原始文本 (Raw Text)，这里不会受 Regex Script (Markdown Only) 的影响
+            const rawContent = lastMsg.mes; 
+            
+            // 简单去重，防止重复触发
+            if (rawContent && rawContent !== lastProcessedContent) {
+                lastProcessedContent = rawContent;
+                
+                // 只有包含协议头才解析
+                if (rawContent.includes('<msg>')) {
+                    parseCommand(rawContent);
+                }
+            }
+        }
+    }
+
+    // === 其他逻辑保持不变 ===
 
     function updateContextInfo() {
         if (!window.SillyTavern || !window.SillyTavern.getContext) return;
@@ -100,7 +115,6 @@
 
         const newFileId = context.chatId || context.characterId;
         if (newFileId && newFileId !== State.currentChatFileId) {
-            console.log(`[OW Phone] 切换存档: ${State.currentChatFileId} -> ${newFileId}`);
             State.currentChatFileId = newFileId;
             State.contacts = {}; 
             loadData(); 
@@ -111,6 +125,7 @@
     function parseCommand(text) {
         if (!text) return;
         const decodedText = text.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+        // 使用全局匹配
         const msgRegex = /<msg>(.+?)\|(.+?)\|(.+?)\|(.+?)<\/msg>/g;
         let match;
         
@@ -120,14 +135,16 @@
             let content = match[3].trim();
             let timeStr = match[4].trim();
 
+            console.log(`[OW Phone] 解析指令: ${sender} -> ${receiver}`);
+
             if (sender.toLowerCase() === 'system' && content.startsWith('ADD:')) {
                 const newContactName = content.replace('ADD:', '').trim();
                 if (!State.contacts[newContactName]) {
                     State.contacts[newContactName] = { messages: [], unread: 0, color: getRandomColor() };
-                    saveData();
-                    toastr.success(`📱 自动添加好友: ${newContactName}`);
-                    if(State.isOpen && !State.currentChat) renderContactList();
                 }
+                saveData(); // 即使已存在也保存一下，防止异常
+                toastr.success(`📱 自动添加好友: ${newContactName}`);
+                if(State.isOpen && !State.currentChat) renderContactList();
                 continue;
             }
 
@@ -212,6 +229,7 @@
         const msgs = State.contacts[name].messages;
         const lastMsg = msgs[msgs.length - 1];
 
+        // 3秒去重保护 (防止事件重复触发导致消息双倍)
         if (lastMsg && lastMsg.content === content && lastMsg.type === type) {
             if (Date.now() - (lastMsg.realTime || 0) < 3000) return;
         }
@@ -365,7 +383,6 @@
         });
     }
 
-    // 优化2：增量渲染聊天记录
     function renderChat(name) {
         State.currentChat = name;
         if(State.contacts[name]) State.contacts[name].unread = 0;
@@ -427,7 +444,6 @@
         panel.empty();
         if (EMOJI_DB.length === 0) {
             panel.html('<div style="color:#aaa; text-align:center; padding:20px;">加载中...</div>');
-            // 如果面板被打开但数据还没到，可以不做处理，等数据到了会自动刷新
             return;
         }
         EMOJI_DB.forEach(item => {
