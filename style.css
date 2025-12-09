@@ -1,6 +1,4 @@
-/* --- 基础样式保持不变，新增以下部分 --- */
-
-/* 悬浮球 (入口) */
+/* --- 悬浮球 --- */
 #ow-phone-toggle {
     position: fixed;
     bottom: 30px;
@@ -21,14 +19,14 @@
 }
 #ow-phone-toggle:hover { transform: scale(1.1); }
 
-/* 主面板 */
+/* --- 手机主容器 --- */
 #ow-phone-container {
     position: fixed;
     bottom: 100px;
     right: 30px;
     width: 340px;
     height: 650px;
-    background: rgba(20, 20, 25, 0.85); /* 稍微深一点，提升对比度 */
+    background: rgba(20, 20, 25, 0.9); /* 深色背景 */
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
     border: 1px solid rgba(255, 255, 255, 0.1);
@@ -39,17 +37,14 @@
     flex-direction: column;
     overflow: hidden;
     color: #fff;
-    font-family: system-ui, -apple-system, sans-serif;
-    transition: opacity 0.2s, transform 0.2s;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
 
 .ow-hidden {
-    opacity: 0;
-    pointer-events: none;
-    transform: scale(0.95) translateY(20px);
+    display: none !important;
 }
 
-/* 顶部 */
+/* --- 顶部标题栏 --- */
 #ow-phone-header {
     height: 50px;
     padding: 0 15px;
@@ -60,153 +55,203 @@
     justify-content: space-between;
     cursor: grab;
     user-select: none;
+    flex-shrink: 0; /* 防止被挤压 */
 }
 #ow-phone-header:active { cursor: grabbing; }
 
-#ow-header-title { font-weight: 600; font-size: 16px; }
-.ow-header-btn { padding: 5px; cursor: pointer; opacity: 0.7; font-size: 18px;}
-.ow-header-btn:hover { opacity: 1; }
+#ow-header-title {
+    font-weight: 600;
+    font-size: 16px;
+    flex: 1;
+    text-align: center;
+}
 
-/* 内容区 */
+/* 顶部按钮通用样式 */
+.ow-header-icon {
+    font-size: 20px;
+    width: 30px; /*以此保证点击区域*/
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    opacity: 0.8;
+    transition: opacity 0.2s;
+}
+.ow-header-icon:hover { opacity: 1; background: rgba(255,255,255,0.1); border-radius: 5px;}
+
+/* --- 内容列表区 --- */
 #ow-phone-body {
     flex: 1;
     overflow-y: auto;
     position: relative;
-    padding-bottom: 10px;
 }
-/* 滚动条隐藏 */
 #ow-phone-body::-webkit-scrollbar { width: 0px; }
 
-/* 联系人列表 */
+/* 空状态提示 */
+.ow-empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: rgba(255,255,255,0.3);
+    font-size: 14px;
+    text-align: center;
+    padding: 20px;
+}
+
+/* 联系人条目 */
 .ow-contact-item {
     display: flex;
     align-items: center;
-    padding: 12px 15px;
+    padding: 15px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.03);
     cursor: pointer;
     transition: background 0.2s;
 }
-.ow-contact-item:hover { background: rgba(255, 255, 255, 0.1); }
+.ow-contact-item:hover { background: rgba(255, 255, 255, 0.08); }
 
 .ow-avatar {
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
+    width: 42px;
+    height: 42px;
+    border-radius: 8px; /* 圆角矩形头像 */
     background: #555;
     margin-right: 12px;
     display: flex;
     justify-content: center;
     align-items: center;
+    font-size: 18px;
     font-weight: bold;
     position: relative;
+    flex-shrink: 0;
 }
 
 .ow-info { flex: 1; min-width: 0; }
-.ow-name { font-size: 15px; font-weight: 500; margin-bottom: 3px; }
-.ow-preview { font-size: 12px; color: rgba(255, 255, 255, 0.5); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ow-name { font-size: 16px; font-weight: 500; margin-bottom: 4px; color: #eee; }
+.ow-preview { font-size: 13px; color: #888; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-/* 聊天气泡 */
+/* --- 聊天界面 --- */
 .ow-chat-view {
     padding: 15px;
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 15px;
+    min-height: 100%; /* 保证内容少时也能撑开 */
 }
-.ow-msg {
-    padding: 8px 12px;
-    border-radius: 12px;
-    font-size: 14px;
-    line-height: 1.4;
-    max-width: 75%;
-    word-wrap: break-word;
-}
-.ow-msg-left { background: rgba(255,255,255,0.1); align-self: flex-start; border-bottom-left-radius: 2px; }
-.ow-msg-right { background: #3b82f6; align-self: flex-end; border-bottom-right-radius: 2px; }
-.ow-msg-img { max-width: 100%; border-radius: 8px; }
 
-/* 底部输入栏 */
-#ow-input-wrapper {
-    background: rgba(0,0,0,0.3);
-    backdrop-filter: blur(10px);
+.ow-msg {
+    padding: 10px 14px;
+    border-radius: 10px;
+    font-size: 14px;
+    line-height: 1.5;
+    max-width: 80%;
+    word-wrap: break-word;
+    position: relative;
+}
+
+.ow-msg-left {
+    background: #333;
+    align-self: flex-start;
+    color: #fff;
+    border-top-left-radius: 2px; /* 微信风格 */
+}
+
+.ow-msg-right {
+    background: #95ec69; /* 微信绿 */
+    color: #000;
+    align-self: flex-end;
+    border-top-right-radius: 2px;
+}
+
+.ow-msg-img {
+    max-width: 120px;
+    border-radius: 5px;
+    display: block;
+}
+
+/* --- 底部输入栏 (Chat模式下显示) --- */
+#ow-chat-footer {
+    background: #1e1e1e;
     border-top: 1px solid rgba(255,255,255,0.05);
     padding: 10px;
+    display: flex;
+    flex-direction: column;
 }
 
 #ow-input-row {
     display: flex;
-    gap: 8px;
     align-items: center;
-    margin-bottom: 8px;
+    gap: 10px;
 }
 
 #ow-input {
     flex: 1;
-    background: rgba(255, 255, 255, 0.1);
+    height: 36px;
+    background: #fff;
     border: none;
-    border-radius: 18px;
-    padding: 8px 12px;
-    color: white;
+    border-radius: 6px;
+    padding: 0 10px;
+    color: #000;
     font-size: 14px;
     outline: none;
 }
 
+/* 按钮图标 */
+.ow-footer-icon {
+    font-size: 24px;
+    cursor: pointer;
+    color: #ccc;
+    padding: 0 5px;
+    transition: color 0.2s;
+}
+.ow-footer-icon:hover { color: #fff; }
+
 #ow-send-btn {
-    width: 32px;
-    height: 32px;
-    background: #3b82f6;
-    border-radius: 50%;
-    display: flex;
-    justify-content: center;
-    align-items: center;
+    background: #95ec69;
+    color: #000;
+    border: none;
+    border-radius: 4px;
+    padding: 6px 12px;
+    font-size: 13px;
     cursor: pointer;
-    font-size: 12px;
+    font-weight: 500;
 }
+#ow-send-btn:active { background: #7acb55; }
 
-/* 功能按钮栏 */
-#ow-func-row {
-    display: flex;
-    justify-content: space-around;
-    padding-top: 5px;
-}
-.ow-func-btn {
-    cursor: pointer;
-    font-size: 20px;
-    opacity: 0.6;
-    transition: transform 0.1s;
-}
-.ow-func-btn:hover { opacity: 1; transform: scale(1.1); }
-
-/* 表情包面板 */
+/* 表情面板 */
 #ow-emoji-panel {
-    height: 150px;
+    height: 180px;
     overflow-y: auto;
-    background: rgba(0,0,0,0.5);
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 5px;
+    background: #2b2b2b;
+    border-top: 1px solid rgba(255,255,255,0.05);
     padding: 10px;
-    border-top: 1px solid rgba(255,255,255,0.1);
+    display: grid;
+    grid-template-columns: repeat(5, 1fr); /* 一行5个 */
+    gap: 8px;
 }
 .ow-emoji-item {
     width: 100%;
     aspect-ratio: 1;
     object-fit: cover;
-    border-radius: 5px;
+    border-radius: 4px;
     cursor: pointer;
+    background: #333;
 }
-.ow-emoji-item:hover { background: rgba(255,255,255,0.1); }
+.ow-emoji-item:hover { opacity: 0.8; }
 
 /* 红点 */
 .ow-badge {
     position: absolute;
-    top: -2px;
-    right: -2px;
-    background: #ef4444;
+    top: -5px;
+    right: -5px;
+    background: #fa5151;
     color: white;
     border-radius: 10px;
-    padding: 0 4px;
+    padding: 0 5px;
     font-size: 10px;
-    min-width: 14px;
+    height: 16px;
+    line-height: 16px;
+    min-width: 16px;
     text-align: center;
-    border: 2px solid #222;
 }
