@@ -174,7 +174,7 @@
         // --- 4. Pending 消息渲染 (保持 v2.1 逻辑) ---
         const queue = window.ST_PHONE.state.pendingQueue;
         const now = Date.now();
-        const MAX_PENDING_TIME = 60000; 
+        const MAX_PENDING_TIME = 600000; 
 
         if (queue.length > 0) {
             let modifiedContactIds = new Set();
