@@ -1,20 +1,33 @@
 // ==================================================================================
-// 脚本名称: ST-iOS-Phone Loader (自动寻路修复版)
-// 作用: 按顺序加载模块，自动识别当前安装目录，无需手动改名
+// 脚本名称: ST-iOS-Phone Loader (最终路径修复版)
+// 作用: 自动识别安装路径，修复 currentScript 为 null 的问题
 // ==================================================================================
 
+// 1. 在任何异步操作开始前，立即获取当前脚本路径
+const scriptTag = document.currentScript || (function() {
+    // 备用方案：如果 currentScript 失效，暴力搜索包含 st-ios-phone 的脚本标签
+    const scripts = document.getElementsByTagName('script');
+    for (let i = 0; i < scripts.length; i++) {
+        if (scripts[i].src && (scripts[i].src.includes('st-ios-phone') || scripts[i].src.includes('iOS')) && scripts[i].src.endsWith('index.js')) {
+            return scripts[i];
+        }
+    }
+    return null;
+})();
+
 (async function () {
-    // --- 核心修复：自动获取当前脚本所在的路径 ---
-    // 既然 index.js 正在运行，document.currentScript 就是它自己
-    // 我们直接拿它的 src，去掉结尾的 "index.js"，就是正确的文件夹路径
-    const currentScript = document.currentScript;
-    const fullUrl = currentScript.src;
-    // 确保以 / 结尾
+    if (!scriptTag) {
+        console.error('❌ ST-iOS-Phone: 无法定位安装路径，请检查文件夹名称是否包含 "st-ios-phone"');
+        return;
+    }
+
+    // 2. 提取路径 (去掉结尾的 index.js)
+    const fullUrl = scriptTag.src;
     const EXTENSION_PATH = fullUrl.substring(0, fullUrl.lastIndexOf('/') + 1);
     
-    console.log(`📱 ST-iOS-Phone: 检测到安装路径为 -> ${EXTENSION_PATH}`);
+    console.log(`📱 ST-iOS-Phone: 路径锁定 -> ${EXTENSION_PATH}`);
 
-    // 模块列表 (顺序很重要：先配置，再界面，最后逻辑)
+    // 3. 模块列表
     const modules = [
         "config.js",
         "view.js",
@@ -36,11 +49,10 @@
     function loadScript(filename) {
         return new Promise((resolve, reject) => {
             const script = document.createElement('script');
-            // 使用自动获取的路径拼接文件名
             script.src = EXTENSION_PATH + filename + '?v=' + Date.now();
             script.onload = resolve;
             script.onerror = () => {
-                console.error(`❌ ST-iOS-Phone: 无法加载 ${filename}，请检查文件是否存在于 ${EXTENSION_PATH}`);
+                console.error(`❌ ST-iOS-Phone: 加载失败 -> ${filename}`);
                 reject(new Error(`Failed to load ${filename}`));
             };
             document.head.appendChild(script);
@@ -48,12 +60,12 @@
     }
 
     try {
-        console.log('📱 ST-iOS-Phone: 开始加载模块...');
+        console.log('📱 ST-iOS-Phone: 开始加载子模块...');
         for (const file of modules) {
             await loadScript(file);
         }
-        console.log('📱 ST-iOS-Phone: 启动成功 (自动路径版)');
+        console.log('📱 ST-iOS-Phone: 系统启动成功！');
     } catch (err) {
-        console.error('📱 ST-iOS-Phone: 启动被终止', err);
+        console.error('📱 ST-iOS-Phone: 启动中断', err);
     }
 })();
