@@ -1,3 +1,7 @@
+/* ==================================================================================
+   模块: Style (样式表) - v1.9 Stable UI (Final Polish)
+   ================================================================================== */
+
 /* =========================================
    全局容器与图标
    ========================================= */
@@ -21,6 +25,7 @@
 #st-phone-icon:active { transform: scale(0.95); }
 #st-phone-icon svg { width: 32px; height: 32px; fill: white; }
 
+/* 手机主窗口 */
 #st-phone-window {
     position: fixed;
     top: 100px;
@@ -38,7 +43,7 @@
 }
 
 /* =========================================
-   顶部刘海
+   顶部刘海与状态栏
    ========================================= */
 .phone-notch-area {
     width: 100%;
@@ -58,7 +63,6 @@
     background-color: #111;
     border-radius: 16px;
 }
-/* 状态栏时间 */
 #status-bar-time {
     position: absolute;
     left: 20px;       
@@ -73,6 +77,9 @@
     white-space: nowrap;
 }
 
+/* =========================================
+   APP 内容容器
+   ========================================= */
 .app-container {
     width: 100%;
     height: calc(100% - 34px);
@@ -88,7 +95,7 @@
 }
 
 /* =========================================
-   页面转场
+   页面转场动画
    ========================================= */
 .page {
     width: 100%;
@@ -108,7 +115,7 @@
 .page.modal-active { transform: translateY(0); z-index: 20; }
 
 /* =========================================
-   iOS 导航栏
+   iOS 导航栏 (Navigation Bar)
    ========================================= */
 .nav-bar {
     height: 44px;
@@ -177,13 +184,13 @@
 }
 
 /* =========================================
-   搜索栏 (原生 iOS 风格 + 反转动效)
+   搜索栏 (Search Bar) - 原生风格
    ========================================= */
 .ios-search-bar {
     padding: 0 16px 8px 16px;
 }
 .search-input {
-    background-color: #E3E3E8; /* 默认浅灰背景 */
+    background-color: #E3E3E8;
     border-radius: 10px;
     height: 36px;
     display: flex;
@@ -193,10 +200,10 @@
     color: #8e8e93;
     font-size: 15px;
     gap: 6px;
-    transition: background-color 0.2s, box-shadow 0.2s; /* 平滑过渡 */
+    transition: background-color 0.2s, box-shadow 0.2s;
 }
 
-/* 搜索图标默认深灰 */
+/* 图标颜色过渡 */
 .search-input svg path {
     fill: #8e8e93;
     transition: fill 0.2s;
@@ -212,22 +219,17 @@
     height: 100%;
     padding-right: 10px;
 }
-#phone-search-bar::placeholder {
-    color: #8e8e93;
-}
+#phone-search-bar::placeholder { color: #8e8e93; }
 
-/* --- 交互动效：点击/输入时反转 --- */
+/* 激活态：变白 */
 .search-input:focus-within {
-    background-color: #FFFFFF; /* 背景变白 */
-    box-shadow: 0 2px 8px rgba(0,0,0,0.05); /* 微微浮起 */
+    background-color: #FFFFFF;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
 }
-/* 此时可以把图标颜色稍微加深一点点，或者保持不变 */
-.search-input:focus-within svg path {
-    fill: #333; 
-}
+.search-input:focus-within svg path { fill: #333; }
 
 /* =========================================
-   联系人列表
+   联系人列表 (Contact List)
    ========================================= */
 .contact-list { flex: 1; overflow-y: auto; }
 
@@ -270,7 +272,7 @@
 }
 
 /* =========================================
-   聊天区域
+   聊天气泡 (Chat Bubbles)
    ========================================= */
 .chat-scroll-area {
     flex: 1;
@@ -318,7 +320,7 @@
 }
 
 /* =========================================
-   新消息 (Compose) 界面样式
+   新消息界面 (Compose)
    ========================================= */
 .to-row {
     display: flex;
@@ -348,7 +350,7 @@
 }
 
 /* =========================================
-   输入区域 (底部) - 发送按钮美化版
+   底部输入栏 (Input Area)
    ========================================= */
 .input-area {
     padding: 10px 16px 20px 16px;
@@ -359,6 +361,7 @@
     border-top: 0.5px solid #bdc5cd;
 }
 
+/* 加号按钮 */
 .plus-btn {
     width: 28px;
     height: 28px;
@@ -375,6 +378,7 @@
 }
 .plus-btn:hover { background-color: #aeb0b2; }
 
+/* 输入框 */
 .chat-input {
     flex: 1;
     border: 1px solid #c6c6c8;
@@ -386,26 +390,33 @@
     height: 36px;
 }
 
-/* --- 莫兰迪黄绿渐变+光效发送键 --- */
+/* --- 发送按钮 (回归经典纯蓝版) --- 
+   修复了椭圆问题，修复了图标不居中问题
+*/
 .send-btn {
+    /* 强制固定宽高，确保是正圆 */
     width: 34px;
+    min-width: 34px;
     height: 34px;
-    border-radius: 50%; /* 绝对正圆 */
+    min-height: 34px;
     
-    background-color: #007AFF; /* 纯正 iOS 蓝 */
+    border-radius: 50%;
     
+    /* 纯正 iOS 蓝，无渐变 */
+    background-color: #007AFF;
+    
+    /* Flex 居中大法 */
     display: flex;
     align-items: center;
     justify-content: center;
+    
     cursor: pointer;
     transition: transform 0.1s, background-color 0.2s;
-    
-    /* 移除之前的 box-shadow 光效，保持扁平干净 */
-    box-shadow: none; 
+    box-shadow: none; /* 移除所有光效 */
 }
 
 .send-btn:hover {
-    background-color: #006ce6; /* 稍微深一点的 hover 态 */
+    background-color: #006ce6; /* 悬停微深 */
 }
 
 .send-btn:active { 
@@ -417,41 +428,17 @@
     height: 18px; 
     fill: white; 
     
-    /* 【关键】移除之前的 margin-left: 2px。
-       Flex 布局下，margin 会导致图标偏离中心。
-       现在是绝对居中。
-    */
+    /* 移除 margin，确保物理居中 */
     margin: 0; 
+    display: block;
     
-    /* 微调：有时候 svg 视觉重心本身不准，可以用 translate 修正 */
+    /* 微调视觉重心 (SVG 图标本身可能会有点偏) */
     transform: translateX(-1px) translateY(1px); 
 }
 
-/* =========================================
-   新消息提示点 (Light Gray Dot)
-   ========================================= */
-.notification-dot {
-    position: absolute;
-    top: -4px;  
-    right: -4px;
-    width: 14px;
-    height: 14px;
-    
-    background-color: #E5E5EA; /* 亮灰色 */
-    border: 2px solid #333; /* 适配底色的描边 */
-    
-    border-radius: 50%;
-    z-index: 99999; /* 【关键】层级拉满，防止被其他元素遮挡 */
-    
-    display: none;
-    transform: scale(0);
-    transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-}
+/* 隐藏滚动条 */
+::-webkit-scrollbar { width: 0px; }
 
-.notification-dot.active {
-    display: block;
-    transform: scale(1);
-}
 /* =========================================
    表情包面板 (Stickers)
    ========================================= */
@@ -494,7 +481,31 @@
     transform: scale(0.9);
     background: #d1d1d6;
 }
-    /* 默认隐藏，有消息时显示 */
+
+/* =========================================
+   新消息提示点 (Notification Dot) - 最终版
+   ========================================= */
+.notification-dot {
+    position: absolute;
+    /* 位置微调，挂在图标右上角 */
+    top: -4px;  
+    right: -4px;
+    
+    width: 14px;
+    height: 14px;
+    
+    /* 高级亮灰色 */
+    background-color: #E5E5EA; 
+    
+    /* 3px 深色描边，制造镂空感 */
+    border: 3px solid #333; 
+    
+    border-radius: 50%;
+    
+    /* 层级拉满，防止被图标遮挡 */
+    z-index: 10000;
+    
+    /* 默认隐藏，激活时显示 */
     display: none;
     transform: scale(0);
     transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
