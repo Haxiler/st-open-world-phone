@@ -58,6 +58,20 @@
     background-color: #111;
     border-radius: 16px;
 }
+/* 状态栏时间 */
+#status-bar-time {
+    position: absolute;
+    left: 20px;       
+    top: 13px;        
+    font-size: 12px;  
+    font-weight: 600;
+    color: #000;
+    z-index: 21;
+    pointer-events: none;
+    font-family: "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+}
 
 .app-container {
     width: 100%;
@@ -90,8 +104,6 @@
 .page.hidden-left { transform: translateX(-30%); opacity: 0.8; }
 .page.hidden-right { transform: translateX(100%); box-shadow: -5px 0 20px rgba(0,0,0,0.1); }
 .page.active { transform: translateX(0); opacity: 1; z-index: 2; }
-
-/* 从底部弹出的 Modal (新消息页) */
 .page.hidden-bottom { transform: translateY(100%); z-index: 20; }
 .page.modal-active { transform: translateY(0); z-index: 20; }
 
@@ -165,13 +177,13 @@
 }
 
 /* =========================================
-   搜索栏
+   搜索栏 (原生 iOS 风格 + 反转动效)
    ========================================= */
 .ios-search-bar {
     padding: 0 16px 8px 16px;
 }
 .search-input {
-    background-color: #e3e3e8;
+    background-color: #E3E3E8; /* 默认浅灰背景 */
     border-radius: 10px;
     height: 36px;
     display: flex;
@@ -181,6 +193,13 @@
     color: #8e8e93;
     font-size: 15px;
     gap: 6px;
+    transition: background-color 0.2s, box-shadow 0.2s; /* 平滑过渡 */
+}
+
+/* 搜索图标默认深灰 */
+.search-input svg path {
+    fill: #8e8e93;
+    transition: fill 0.2s;
 }
 
 #phone-search-bar {
@@ -195,6 +214,16 @@
 }
 #phone-search-bar::placeholder {
     color: #8e8e93;
+}
+
+/* --- 交互动效：点击/输入时反转 --- */
+.search-input:focus-within {
+    background-color: #FFFFFF; /* 背景变白 */
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05); /* 微微浮起 */
+}
+/* 此时可以把图标颜色稍微加深一点点，或者保持不变 */
+.search-input:focus-within svg path {
+    fill: #333; 
 }
 
 /* =========================================
@@ -283,7 +312,6 @@
     border-bottom-right-radius: 4px;
 }
 
-/* 待发送消息样式 (保活) */
 .message-bubble.pending {
     opacity: 0.6;
     transition: opacity 0.3s;
@@ -320,7 +348,7 @@
 }
 
 /* =========================================
-   输入区域 (底部)
+   输入区域 (底部) - 发送按钮美化版
    ========================================= */
 .input-area {
     padding: 10px 16px 20px 16px;
@@ -358,19 +386,41 @@
     height: 36px;
 }
 
+/* --- 莫兰迪黄绿渐变+光效发送键 --- */
 .send-btn {
-    width: 32px;
-    height: 32px;
-    background-color: #007AFF;
-    border-radius: 50%;
+    width: 34px; /* 稍微大一圈 */
+    height: 34px;
+    border-radius: 50%; /* 纯圆 */
+    
+    /* 莫兰迪黄绿渐变 (Morandi Yellow-Green) */
+    /* 从柔和的鹅黄绿渐变到稍深的橄榄绿 */
+    background: linear-gradient(135deg, #F0F9A7 10%, #C8E6C9 100%);
+    
+    /* 光效 (Glow) */
+    /* 外阴影：弥散光 | 内阴影：玻璃高光 */
+    box-shadow: 
+        0 4px 10px rgba(180, 210, 160, 0.5), 
+        inset 0 1px 1px rgba(255, 255, 255, 0.8);
+    
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    transition: transform 0.1s;
+    transition: transform 0.1s, box-shadow 0.2s;
 }
-.send-btn svg { width: 18px; height: 18px; fill: white; margin-left: 2px; }
-.send-btn:active { transform: scale(0.9); }
+
+.send-btn svg { 
+    width: 16px; 
+    height: 16px; 
+    fill: #5A6A55; /* 图标换成深色莫兰迪绿，对比度更好看 */
+    margin-left: 2px; /* 视觉修正 */
+}
+
+/* 按下时的微动效 */
+.send-btn:active { 
+    transform: scale(0.92); 
+    box-shadow: 0 2px 5px rgba(180, 210, 160, 0.5);
+}
 
 ::-webkit-scrollbar { width: 0px; }
 
@@ -396,7 +446,7 @@
     overflow-y: auto;
     padding: 10px;
     display: grid;
-    grid-template-columns: repeat(4, 1fr); /* 一行4个 */
+    grid-template-columns: repeat(4, 1fr); 
     gap: 10px;
     align-content: start;
 }
@@ -415,22 +465,4 @@
 .sticker-grid img:active {
     transform: scale(0.9);
     background: #d1d1d6;
-}
-/* ...原有样式... */
-
-/* =========================================
-   状态栏时间 (适配日期显示)
-   ========================================= */
-#status-bar-time {
-    position: absolute;
-    left: 20px;       /* 向左挪一点，给长日期留空间 */
-    top: 13px;        /* 保持垂直居中 */
-    font-size: 12px;  /* 字号稍微改小，防止撞到刘海 */
-    font-weight: 600;
-    color: #000;
-    z-index: 21;
-    pointer-events: none;
-    font-family: "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
-    letter-spacing: 0.5px;
-    white-space: nowrap; /* 防止换行 */
 }
