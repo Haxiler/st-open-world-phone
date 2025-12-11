@@ -15,9 +15,6 @@
         // 表情包库 (已整合你的数据)
         stickers: [
             // --- 基础互动 ---
-            ---
-stickers: [
-            // --- 基础互动 ---
             { label: "打招呼", url: "https://sharkpan.xyz/f/LgwT7/AC229A80203166B292155ADA057DE423_0.gif" },
             { label: "开心", url: "https://sharkpan.xyz/f/aVwtY/0CBEE9105C7A98E0E6162A79CCD09EFA_0.gif" },
             { label: "爱心", url: "https://sharkpan.xyz/f/53nhj/345FFC998474F46C1A40B1567335DA03_0.gif" },
