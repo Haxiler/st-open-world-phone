@@ -37,7 +37,6 @@
 { label: "耍赖", url: "https://files.catbox.moe/9m913y.gif" },
 { label: "咦！（震惊）", url: "https://files.catbox.moe/j270y8.gif" },
 { label: "疑惑", url: "https://files.catbox.moe/td6tla.gif" },
-{ label: "不行", url: "https://files.catbox.moe/xp0nx5.gif" },
 { label: "棒", url: "https://files.catbox.moe/xp0nx5.gif" },
 { label: "OK", url: "https://files.catbox.moe/z7rstl.gif" },
 { label: "打你", url: "https://files.catbox.moe/ccdwsh.gif" },
@@ -150,7 +149,6 @@
 { label: "拉大便------！", url: "https://i.postimg.cc/gkCmFMJP/1.jpg" },
 { label: "谁想亲亲老子", url: "https://i.postimg.cc/zGYZPVdt/1.jpg" },
 { label: "要鸡巴干啥", url: "https://i.postimg.cc/9Q2Xw8j1/1.jpg" },
-{ label: "我不行了", url: "https://i.postimg.cc/rytqnXVN/1.jpg" },
 { label: "Wink 放个电迷死你", url: "https://i.postimg.cc/jjFrcvBF/1.jpg" },
 { label: "又是艳阳天 咪舒适", url: "https://i.postimg.cc/2SjRfPDs/1.jpg" },
 { label: "我很脆弱 宠着我好吗", url: "https://i.postimg.cc/7YDjgpbs/1.jpg" },
@@ -159,7 +157,7 @@
 { label: "哎这事难办", url: "https://i.postimg.cc/sXYwxgPh/1.jpg" },
 { label: "你个屌毛 出去别说我认识你", url: "https://i.postimg.cc/6QRhbpPs/1.jpg" },
 { label: "我的手段你是知道的", url: "https://i.postimg.cc/qv6cg744/1.jpg" },
-{ label: "需要咪帮倒忙吗", url: "https://i.postimg.cc/PfF8Zk6p/1.jpg" },
+{ label: "需要咪帮倒忙吗", url: "https://i.postimg.cc/PfF8Zk6p/1.jpg" }
         ]
     };
 })();
