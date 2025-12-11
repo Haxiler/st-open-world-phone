@@ -353,6 +353,8 @@
         }
     };
 
+// ... (上面的代码保持不变)
+
     document.getElementById('st-phone-icon').addEventListener('click', () => {
         const isOpen = window.ST_PHONE.ui.toggleWindow();
         if(isOpen) document.dispatchEvent(new CustomEvent('st-phone-opened'));
@@ -380,4 +382,40 @@
         }
     });
     document.getElementById('btn-toggle-stickers').onclick = window.ST_PHONE.ui.toggleStickerPanel;
-})();
+
+    // ============================================================
+    // 【核心修复】输入框按键逻辑 (支持 Shift+Enter 换行)
+    // ============================================================
+    const msgInput = document.getElementById('msg-input');
+    if(msgInput) {
+        // 1. 改用 keydown 事件，才能准确捕捉 Shift 键状态
+        msgInput.addEventListener('keydown', (e) => { 
+            if (e.key === 'Enter') {
+                if (e.shiftKey) {
+                    // 情况 A：按下 Shift+Enter
+                    // 默认行为就是换行，所以这里直接 return，允许浏览器插入换行符
+                    return;
+                } else {
+                    // 情况 B：仅按下 Enter
+                    // 阻止默认的换行行为，改为执行发送逻辑
+                    e.preventDefault();
+                    
+                    // 只有当输入框有内容时才发送
+                    if (e.target.value.trim()) {
+                        document.getElementById('btn-send').click(); // 触发发送按钮点击
+                    }
+                    
+                    // 发送后重置输入框高度回默认值 (配合 CSS 的 height: 36px)
+                    e.target.style.height = '36px'; 
+                }
+            }
+        });
+        
+        // 2. 自动高度：让输入框随着文字变多自动长高
+        msgInput.addEventListener('input', function() {
+            this.style.height = '36px'; // 先重置
+            this.style.height = (this.scrollHeight) + 'px'; // 再设为实际内容高度
+        });
+    }
+
+})(); // 闭包结束
