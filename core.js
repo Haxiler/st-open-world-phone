@@ -46,7 +46,7 @@
     let lastChatLength = 0; 
     let lastXmlMsgCount = -1;
 
-    const REGEX_XML_MSG = /<msg>(.+?)\|(.+?)\|(.+?)\|(.+?)<\/msg>/gi;
+    const REGEX_XML_MSG = /<msg>(.+?)\|(.+?)\|([\s\S]+?)\|(.*?)<\/msg>/gi;
     const REGEX_STORY_TIME = /(?:<|&lt;)time(?:>|&gt;)(.*?)(?:<|&lt;)\/time(?:>|&gt;)/i;
 
     function isUserSender(name, context) {
@@ -275,8 +275,12 @@
         
         if (mainTextArea) {
             const originalText = mainTextArea.value;
-            const separator = originalText.length > 0 ? '\n' : '';
-            mainTextArea.value = originalText + separator + xmlString;
+            // 确保如果有旧内容，先换行；注入xml后，再自动加一个换行(\n)方便下一条
+            const prefix = originalText.length > 0 ? '\n' : '';
+            
+            // 【关键修改】末尾加上 '\n'
+            mainTextArea.value = originalText + prefix + xmlString + '\n'; 
+            
             mainTextArea.dispatchEvent(new Event('input', { bubbles: true }));
             
             window.ST_PHONE.state.pendingQueue.push({
