@@ -1,15 +1,14 @@
 // ==================================================================================
-// 模块: View (界面与交互) - v2.0 Smart Scroll
+// 模块: View (界面与交互) - v2.1 Timestamp Logic
 // ==================================================================================
 (function() {
     if (document.getElementById('st-ios-phone-root')) return;
 
-    // 1. HTML 模板
+    // 1. HTML 模板 (保持不变)
     const html = `
     <div id="st-ios-phone-root">
         <div id="st-phone-icon" title="打开/关闭手机">
             <div id="st-notification-dot" class="notification-dot"></div>
-            
             <svg viewBox="0 0 24 24"><path d="M17 1.01L7 1c-1.1 0-2 .9-2 2v18c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2V3c0-1.1-.9-1.99-2-1.99zM17 19H7V5h10v14z"/></svg>
         </div>
         <div id="st-phone-window">
@@ -17,10 +16,8 @@
                 <div id="status-bar-time">12:00</div>
                 <div class="phone-notch"></div>
             </div>
-            
             <div class="app-container">
                 <div class="pages-wrapper">
-                    
                     <div class="page active" id="page-contacts">
                         <div class="nav-bar ios-nav">
                             <div style="width: 40px;"></div>
@@ -37,7 +34,6 @@
                         </div>
                         <div class="contact-list" id="contact-list-container"></div>
                     </div>
-
                     <div class="page hidden-bottom" id="page-new-msg">
                         <div class="nav-bar ios-nav">
                             <button class="nav-btn text-btn" id="btn-cancel-new">取消</button>
@@ -51,7 +47,6 @@
                         <div class="section-title">建议</div>
                         <div class="contact-list" id="new-msg-suggestions"></div>
                     </div>
-
                     <div class="page hidden-right" id="page-chat">
                         <div class="nav-bar ios-nav-detail">
                             <button class="nav-btn back-btn" id="btn-back">
@@ -64,7 +59,6 @@
                             <button class="nav-btn" style="visibility:hidden; width: 40px"></button>
                         </div>
                         <div class="chat-scroll-area" id="chat-messages-container"></div>
-                        
                         <div class="input-area">
                             <div class="plus-btn" id="btn-toggle-stickers">
                                 <svg viewBox="0 0 24 24" width="16" height="16" fill="#8e8e93"><path d="M12 5v14M5 12h14" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg>
@@ -78,7 +72,6 @@
                             <div class="sticker-grid" id="sticker-grid-container"></div>
                         </div>
                     </div>
-
                 </div>
             </div>
         </div>
@@ -143,10 +136,7 @@
             }
             window.ST_PHONE.state.isPhoneOpen = !window.ST_PHONE.state.isPhoneOpen;
             windowEl.style.display = window.ST_PHONE.state.isPhoneOpen ? 'block' : 'none';
-            
-            if (window.ST_PHONE.state.isPhoneOpen) {
-                this.setNotification(false);
-            }
+            if (window.ST_PHONE.state.isPhoneOpen) this.setNotification(false);
             return window.ST_PHONE.state.isPhoneOpen;
         },
 
@@ -193,48 +183,75 @@
             });
         },
         
-        // 【关键修改】renderChat: 增加 forceScroll 参数，实现智能滚动
+        // 【关键修改】renderChat: 智能滚动 + 智能时间戳
         renderChat: function(contact, forceScroll = false) {
             const container = document.getElementById('chat-messages-container');
             
-            // A. 记录当前滚动状态
-            const threshold = 60; // 阈值：距离底部多少像素内算作“正在看最新消息”
+            const threshold = 60; 
             const currentScrollTop = container.scrollTop;
             const currentScrollHeight = container.scrollHeight;
             const clientHeight = container.clientHeight;
-            
-            // 判断是否处于底部附近
             const isNearBottom = (currentScrollHeight - currentScrollTop - clientHeight) <= threshold;
-            // 判断是否是初次渲染
             const isFirstLoad = container.children.length === 0;
 
-            // B. 重绘 DOM
             container.innerHTML = '';
             container.appendChild(document.createElement('div')).style.height = '10px';
-            contact.messages.forEach(msg => {
+            
+            // --- 时间戳状态变量 ---
+            let lastRenderedTimestamp = 0;
+            let lastRenderedDateStr = '';
+            const TIME_GAP = 15 * 60 * 1000; // 15分钟
+
+            contact.messages.forEach((msg, index) => {
+                // 1. 判断是否需要插入时间戳
+                let showTimestamp = false;
+                
+                // 规则A: 第一条必显
+                if (index === 0) showTimestamp = true;
+                
+                // 规则B: 跨天必显 (例如 10月23日 -> 10月24日)
+                if (msg.dateStr && msg.dateStr !== lastRenderedDateStr) showTimestamp = true;
+                
+                // 规则C: 间隔 > 15分钟 (且不是跨天，因为跨天已经显了)
+                // 只有当两个时间都有效(>0)时才计算间隔
+                if (!showTimestamp && lastRenderedTimestamp > 0 && msg.timestamp > 0) {
+                    if (msg.timestamp - lastRenderedTimestamp > TIME_GAP) {
+                        showTimestamp = true;
+                    }
+                }
+
+                // 2. 插入时间戳 DOM
+                if (showTimestamp) {
+                    const timeEl = document.createElement('div');
+                    timeEl.className = 'chat-timestamp';
+                    timeEl.innerText = msg.timeStr; // 显示完整时间字符串 (如 10月23日 10:30)
+                    container.appendChild(timeEl);
+                    
+                    // 更新状态
+                    lastRenderedTimestamp = msg.timestamp;
+                    lastRenderedDateStr = msg.dateStr;
+                }
+
+                // 3. 插入消息气泡
                 const el = document.createElement('div');
                 el.className = `message-bubble ${msg.sender === 'user' ? 'sent' : 'received'} ${msg.isPending ? 'pending' : ''}`;
                 el.innerHTML = renderMessageContent(msg.text);
                 container.appendChild(el);
             });
 
-            // C. 智能恢复滚动位置
             setTimeout(() => {
                 const newHeight = container.scrollHeight;
-                
                 if (forceScroll || isNearBottom || isFirstLoad) {
-                    // 只有在这些情况下才强制滚到底部
                     container.scrollTop = newHeight;
                 } else {
-                    // 否则，保持原来的阅读位置不动
                     container.scrollTop = currentScrollTop;
                 }
             }, 0);
         },
+
         openChat: function(contact) {
             window.ST_PHONE.state.activeContactId = contact.id;
             document.getElementById('chat-title').innerText = contact.name;
-            // 打开新聊天时，强制滚到底部 (true)
             window.ST_PHONE.ui.renderChat(contact, true);
             document.getElementById('sticker-panel').classList.add('hidden');
             document.getElementById('page-contacts').classList.add('hidden-left');
@@ -310,7 +327,6 @@
         }
     };
 
-    // 5. 事件绑定
     document.getElementById('st-phone-icon').addEventListener('click', () => {
         const isOpen = window.ST_PHONE.ui.toggleWindow();
         if(isOpen) document.dispatchEvent(new CustomEvent('st-phone-opened'));
