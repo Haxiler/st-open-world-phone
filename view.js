@@ -1,5 +1,5 @@
 // ==================================================================================
-// 模块: View (界面与交互) - v2.1 Timestamp Logic
+// 模块: View (界面与交互) - v2.2 Unread UI
 // ==================================================================================
 (function() {
     if (document.getElementById('st-ios-phone-root')) return;
@@ -114,37 +114,26 @@
 
     // 3. 辅助：渲染消息
     function renderMessageContent(text) {
-    // 1. 核心逻辑：只匹配 [bqb-数字] 格式
-    const bqbRegex = /\[bqb-(\d+)\]/g; 
-    
-    let html = text.replace(bqbRegex, (match, indexStr) => {
-        const index = parseInt(indexStr);
-        const stickers = window.ST_PHONE.config.stickers || [];
+        const bqbRegex = /\[bqb-(\d+)\]/g; 
         
-        // 通过数字索引直接取图
-        const sticker = stickers[index]; 
-        
-        if (sticker) {
-             // 找到图片：渲染它
-             // 这里的 alt 属性依然保留原标签名，方便鼠标悬停时查看含义
-             return `<img src="${sticker.url}" alt="${sticker.label || indexStr}" class="sticker-img" loading="lazy" />`;
-        }
-        
-        // 没找到图片（比如索引越界）：返回空字符串，实现“静默失败”
-        return ''; 
-    });
+        let html = text.replace(bqbRegex, (match, indexStr) => {
+            const index = parseInt(indexStr);
+            const stickers = window.ST_PHONE.config.stickers || [];
+            const sticker = stickers[index]; 
+            if (sticker) {
+                 return `<img src="${sticker.url}" alt="${sticker.label || indexStr}" class="sticker-img" loading="lazy" />`;
+            }
+            return ''; 
+        });
 
-    // 2. 清理逻辑：清除所有如果不小心生造出来的非数字标签（如 [bqb-哈哈]）
-    // 这是一道双重保险
-    const invalidBqbRegex = /\[bqb-([^\]\d]+)\]/g;
-    html = html.replace(invalidBqbRegex, '');
-    
-    // 3. 处理 Markdown 图片（保持原样）
-    const mdImgRegex = /!\[.*?\]\((.*?)\)/g;
-    html = html.replace(mdImgRegex, '<img src="$1" alt="sticker" loading="lazy" />');
-    
-    return html;
-}
+        const invalidBqbRegex = /\[bqb-([^\]\d]+)\]/g;
+        html = html.replace(invalidBqbRegex, '');
+        
+        const mdImgRegex = /!\[.*?\]\((.*?)\)/g;
+        html = html.replace(mdImgRegex, '<img src="$1" alt="sticker" loading="lazy" />');
+        
+        return html;
+    }
 
     // 4. UI 导出
     window.ST_PHONE.ui = {
@@ -189,10 +178,17 @@
             contacts.forEach(contact => {
                 const el = document.createElement('div');
                 el.className = 'contact-item';
+                
+                // 【新增】未读蓝点渲染
+                const unreadDot = contact.hasUnread ? `<div class="unread-dot-indicator"></div>` : '';
+
                 el.innerHTML = `
                     <div class="info">
                         <div class="name-row">
-                            <span class="name">${contact.name}</span>
+                            <span class="name">
+                                ${contact.name}
+                                ${unreadDot}
+                            </span>
                             <span class="time">${contact.time}</span>
                         </div>
                         <div class="preview">${contact.lastMsg}</div>
@@ -203,7 +199,6 @@
             });
         },
         
-        // 【关键修改】renderChat: 智能滚动 + 智能时间戳
         renderChat: function(contact, forceScroll = false) {
             const container = document.getElementById('chat-messages-container');
             
@@ -217,42 +212,31 @@
             container.innerHTML = '';
             container.appendChild(document.createElement('div')).style.height = '10px';
             
-            // --- 时间戳状态变量 ---
             let lastRenderedTimestamp = 0;
             let lastRenderedDateStr = '';
-            const TIME_GAP = 15 * 60 * 1000; // 15分钟
+            const TIME_GAP = 15 * 60 * 1000; 
 
             contact.messages.forEach((msg, index) => {
-                // 1. 判断是否需要插入时间戳
                 let showTimestamp = false;
                 
-                // 规则A: 第一条必显
                 if (index === 0) showTimestamp = true;
-                
-                // 规则B: 跨天必显 (例如 10月23日 -> 10月24日)
                 if (msg.dateStr && msg.dateStr !== lastRenderedDateStr) showTimestamp = true;
-                
-                // 规则C: 间隔 > 15分钟 (且不是跨天，因为跨天已经显了)
-                // 只有当两个时间都有效(>0)时才计算间隔
                 if (!showTimestamp && lastRenderedTimestamp > 0 && msg.timestamp > 0) {
                     if (msg.timestamp - lastRenderedTimestamp > TIME_GAP) {
                         showTimestamp = true;
                     }
                 }
 
-                // 2. 插入时间戳 DOM
                 if (showTimestamp) {
                     const timeEl = document.createElement('div');
                     timeEl.className = 'chat-timestamp';
-                    timeEl.innerText = msg.timeStr; // 显示完整时间字符串 (如 10月23日 10:30)
+                    timeEl.innerText = msg.timeStr; 
                     container.appendChild(timeEl);
                     
-                    // 更新状态
                     lastRenderedTimestamp = msg.timestamp;
                     lastRenderedDateStr = msg.dateStr;
                 }
 
-                // 3. 插入消息气泡
                 const el = document.createElement('div');
                 el.className = `message-bubble ${msg.sender === 'user' ? 'sent' : 'received'} ${msg.isPending ? 'pending' : ''}`;
                 el.innerHTML = renderMessageContent(msg.text);
@@ -271,6 +255,17 @@
 
         openChat: function(contact) {
             window.ST_PHONE.state.activeContactId = contact.id;
+            
+            // 【新增】打开聊天时，清除未读状态
+            if (window.ST_PHONE.state.unreadIds) {
+                window.ST_PHONE.state.unreadIds.delete(contact.id);
+            }
+            // 重新渲染联系人列表以去掉蓝点（可选，但体验更好）
+            // 由于 core.js 会定时刷新，这里也可以不立即刷新，但为了及时反馈还是加上
+            // 只是为了不重绘整个列表导致闪烁，我们可以手动移除 DOM 中的蓝点，
+            // 或者简单地再次调用 renderContacts。鉴于性能开销不大，直接调用：
+            window.ST_PHONE.ui.renderContacts();
+
             document.getElementById('chat-title').innerText = contact.name;
             window.ST_PHONE.ui.renderChat(contact, true);
             document.getElementById('sticker-panel').classList.add('hidden');
@@ -285,6 +280,8 @@
             document.getElementById('page-contacts').classList.add('active');
             document.getElementById('page-chat').classList.add('hidden-right');
             document.getElementById('page-chat').classList.remove('active');
+            // 关闭聊天时，可能刚才发了消息，刷新一下列表
+            window.ST_PHONE.ui.renderContacts();
         },
         toggleNewMsgSheet: function(show) {
             const sheet = document.getElementById('page-new-msg');
@@ -326,19 +323,14 @@
             const isHidden = panel.classList.contains('hidden');
             
             if (isHidden) {
-                // 如果是第一次打开，生成表情网格
                 if (container.children.length === 0) {
                     const stickers = window.ST_PHONE.config.stickers || [];
-                    
-                    // 【关键修改点 1】forEach 中加入 index 参数
                     stickers.forEach((s, index) => {
                         const img = document.createElement('img');
                         img.src = s.url;
-                        img.title = s.label; // 鼠标悬停依然显示中文含义
-                        
+                        img.title = s.label; 
                         img.onclick = () => {
                             const input = document.getElementById('msg-input');
-                            // 【关键修改点 2】发送时填入 [bqb-数字] 而不是 [bqb-中文]
                             input.value = `[bqb-${index}]`; 
                             document.getElementById('btn-send').click();
                             panel.classList.add('hidden');
@@ -352,8 +344,6 @@
             }
         }
     };
-
-// ... (上面的代码保持不变)
 
     document.getElementById('st-phone-icon').addEventListener('click', () => {
         const isOpen = window.ST_PHONE.ui.toggleWindow();
@@ -383,39 +373,25 @@
     });
     document.getElementById('btn-toggle-stickers').onclick = window.ST_PHONE.ui.toggleStickerPanel;
 
-    // ============================================================
-    // 【核心修复】输入框按键逻辑 (支持 Shift+Enter 换行)
-    // ============================================================
     const msgInput = document.getElementById('msg-input');
     if(msgInput) {
-        // 1. 改用 keydown 事件，才能准确捕捉 Shift 键状态
         msgInput.addEventListener('keydown', (e) => { 
             if (e.key === 'Enter') {
                 if (e.shiftKey) {
-                    // 情况 A：按下 Shift+Enter
-                    // 默认行为就是换行，所以这里直接 return，允许浏览器插入换行符
                     return;
                 } else {
-                    // 情况 B：仅按下 Enter
-                    // 阻止默认的换行行为，改为执行发送逻辑
                     e.preventDefault();
-                    
-                    // 只有当输入框有内容时才发送
                     if (e.target.value.trim()) {
-                        document.getElementById('btn-send').click(); // 触发发送按钮点击
+                        document.getElementById('btn-send').click(); 
                     }
-                    
-                    // 发送后重置输入框高度回默认值 (配合 CSS 的 height: 36px)
                     e.target.style.height = '36px'; 
                 }
             }
         });
-        
-        // 2. 自动高度：让输入框随着文字变多自动长高
         msgInput.addEventListener('input', function() {
-            this.style.height = '36px'; // 先重置
-            this.style.height = (this.scrollHeight) + 'px'; // 再设为实际内容高度
+            this.style.height = '36px'; 
+            this.style.height = (this.scrollHeight) + 'px'; 
         });
     }
 
-})(); // 闭包结束
+})();
