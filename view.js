@@ -1,10 +1,10 @@
 // ==================================================================================
-// 模块: View (界面与交互) - v2.3 Event Fix & Unread
+// 模块: View (界面与交互) - v3.0 Settings & Auto-WorldInfo
 // ==================================================================================
 (function() {
     if (document.getElementById('st-ios-phone-root')) return;
 
-    // 1. HTML 模板 (保持不变)
+    // 1. HTML 模板 (新增 page-settings 和 设置入口)
     const html = `
     <div id="st-ios-phone-root">
         <div id="st-phone-icon" title="打开/关闭手机">
@@ -18,9 +18,15 @@
             </div>
             <div class="app-container">
                 <div class="pages-wrapper">
+                    
                     <div class="page active" id="page-contacts">
                         <div class="nav-bar ios-nav">
-                            <div style="width: 40px;"></div>
+                            <button class="nav-btn icon" id="btn-open-settings" title="设置">
+                                <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#007AFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <circle cx="12" cy="12" r="3"></circle>
+                                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                                </svg>
+                            </button>
                             <span class="nav-title">信息</span>
                             <button class="nav-btn icon" id="btn-add-friend" title="新对话">
                                 <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#007AFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
@@ -34,6 +40,7 @@
                         </div>
                         <div class="contact-list" id="contact-list-container"></div>
                     </div>
+
                     <div class="page hidden-bottom" id="page-new-msg">
                         <div class="nav-bar ios-nav">
                             <button class="nav-btn text-btn" id="btn-cancel-new">取消</button>
@@ -47,6 +54,7 @@
                         <div class="section-title">建议</div>
                         <div class="contact-list" id="new-msg-suggestions"></div>
                     </div>
+
                     <div class="page hidden-right" id="page-chat">
                         <div class="nav-bar ios-nav-detail">
                             <button class="nav-btn back-btn" id="btn-back">
@@ -72,6 +80,33 @@
                             <div class="sticker-grid" id="sticker-grid-container"></div>
                         </div>
                     </div>
+
+                    <div class="page hidden-right" id="page-settings" style="background-color: #f2f2f7;">
+                        <div class="nav-bar ios-nav">
+                            <button class="nav-btn back-btn" id="btn-settings-back">
+                                <svg viewBox="0 0 24 24" width="24" height="24" stroke="#007AFF" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+                                <span>信息</span>
+                            </button>
+                            <span class="nav-title">设置</span>
+                            <div style="width: 40px;"></div>
+                        </div>
+                        <div style="padding: 20px 0;">
+                            <div class="section-title">存储设置</div>
+                            <div style="background: white; border-top: 0.5px solid #c6c6c8; border-bottom: 0.5px solid #c6c6c8; padding: 0 16px;">
+                                <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 0;">
+                                    <span style="font-size: 16px; color: #000;">存入世界书</span>
+                                    <select id="setting-worldbook-select" style="font-size: 15px; color: #007AFF; border: none; background: transparent; outline: none; text-align: right; max-width: 200px;">
+                                        <option value="">加载中...</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div style="padding: 8px 16px; font-size: 13px; color: #6d6d72;">
+                                选中的世界书将用于永久保存短信记录。如果不选，默认为临时存储。
+                                <br>自动匹配：已尝试选中当前角色绑定的世界书。
+                            </div>
+                        </div>
+                    </div>
+
                 </div>
             </div>
         </div>
@@ -82,7 +117,7 @@
     div.innerHTML = html;
     document.body.appendChild(div);
 
-    // 2. 拖拽逻辑
+    // 2. 拖拽逻辑 (保持不变)
     function makeDraggable(element, handle) {
         let pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
         handle.onmousedown = dragMouseDown;
@@ -112,10 +147,9 @@
     makeDraggable(document.getElementById("st-phone-window"), document.getElementById("phone-drag-handle"));
     makeDraggable(document.getElementById("st-phone-icon"), document.getElementById("st-phone-icon"));
 
-    // 3. 辅助：渲染消息
+    // 3. 辅助：渲染消息 (保持不变)
     function renderMessageContent(text) {
         const bqbRegex = /\[bqb-(\d+)\]/g; 
-        
         let html = text.replace(bqbRegex, (match, indexStr) => {
             const index = parseInt(indexStr);
             const stickers = window.ST_PHONE.config.stickers || [];
@@ -125,13 +159,10 @@
             }
             return ''; 
         });
-
         const invalidBqbRegex = /\[bqb-([^\]\d]+)\]/g;
         html = html.replace(invalidBqbRegex, '');
-        
         const mdImgRegex = /!\[.*?\]\((.*?)\)/g;
         html = html.replace(mdImgRegex, '<img src="$1" alt="sticker" loading="lazy" />');
-        
         return html;
     }
 
@@ -178,10 +209,7 @@
             contacts.forEach(contact => {
                 const el = document.createElement('div');
                 el.className = 'contact-item';
-                
-                // 未读蓝点渲染
                 const unreadDot = contact.hasUnread ? `<div class="unread-dot-indicator"></div>` : '';
-
                 el.innerHTML = `
                     <div class="info">
                         <div class="name-row">
@@ -218,7 +246,6 @@
 
             contact.messages.forEach((msg, index) => {
                 let showTimestamp = false;
-                
                 if (index === 0) showTimestamp = true;
                 if (msg.dateStr && msg.dateStr !== lastRenderedDateStr) showTimestamp = true;
                 if (!showTimestamp && lastRenderedTimestamp > 0 && msg.timestamp > 0) {
@@ -232,7 +259,6 @@
                     timeEl.className = 'chat-timestamp';
                     timeEl.innerText = msg.timeStr; 
                     container.appendChild(timeEl);
-                    
                     lastRenderedTimestamp = msg.timestamp;
                     lastRenderedDateStr = msg.dateStr;
                 }
@@ -255,8 +281,6 @@
 
         openChat: function(contact) {
             window.ST_PHONE.state.activeContactId = contact.id;
-            
-            // 打开聊天时，清除该联系人的未读状态
             if (window.ST_PHONE.state.unreadIds) {
                 window.ST_PHONE.state.unreadIds.delete(contact.id);
             }
@@ -337,14 +361,112 @@
             } else {
                 panel.classList.add('hidden');
             }
+        },
+
+        // --- 新增：设置页逻辑 ---
+        openSettings: async function() {
+            const pageContacts = document.getElementById('page-contacts');
+            const pageSettings = document.getElementById('page-settings');
+            const select = document.getElementById('setting-worldbook-select');
+
+            // 1. 切换页面动画
+            pageContacts.classList.add('hidden-left');
+            pageContacts.classList.remove('active');
+            pageSettings.classList.remove('hidden-right');
+            pageSettings.classList.add('active');
+
+            // 2. 加载世界书列表
+            select.innerHTML = '<option value="">加载中...</option>';
+            
+            let worldBooks = [];
+            // 尝试通过 SillyTavern API 获取 (模拟)
+            try {
+                // 如果有 scribe 模块提供的获取列表方法，就用它（之后会在 scribe.js 实现）
+                if (window.ST_PHONE.scribe && window.ST_PHONE.scribe.getWorldBookList) {
+                    worldBooks = await window.ST_PHONE.scribe.getWorldBookList();
+                } else {
+                    // Fallback: 如果没有 scribe，尝试读 SillyTavern 全局变量作为演示
+                    if (typeof SillyTavern !== 'undefined' && SillyTavern.contexts && SillyTavern.contexts.worldInfo) {
+                        // 注意：这只是内存里的，不完全是文件列表，但作为 fallback 够用了
+                        worldBooks = SillyTavern.contexts.worldInfo.map(wi => wi.originalName || wi.name);
+                    }
+                }
+            } catch (e) {
+                console.error('无法获取世界书列表', e);
+            }
+
+            select.innerHTML = '<option value="">(暂不存储)</option>';
+            
+            // 3. 填充选项
+            // 去重
+            const uniqueBooks = [...new Set(worldBooks)];
+            uniqueBooks.forEach(name => {
+                if(!name) return;
+                const opt = document.createElement('option');
+                opt.value = name;
+                opt.innerText = name;
+                select.appendChild(opt);
+            });
+
+            // 4. 回显选中状态 (或自动选择)
+            let currentSelection = window.ST_PHONE.config.targetWorldBook;
+
+            // --- 自动选择逻辑核心 ---
+            if (!currentSelection) {
+                // 尝试获取当前角色绑定的世界书
+                if (typeof SillyTavern !== 'undefined') {
+                    const context = SillyTavern.getContext();
+                    const charId = context.characterId;
+                    // 安全访问
+                    if (charId && SillyTavern.characters && SillyTavern.characters[charId]) {
+                        const charData = SillyTavern.characters[charId].data;
+                        // 字段可能是 character_book (V2)
+                        const boundBook = charData.character_book;
+                        if (boundBook && uniqueBooks.includes(boundBook.name || boundBook)) {
+                            // 找到了绑定的书，且书在列表里
+                            currentSelection = boundBook.name || boundBook;
+                            // 顺便保存一下这个自动选择，免得下次还要猜
+                            window.ST_PHONE.config.targetWorldBook = currentSelection;
+                            console.log(`📱 ST-iOS-Phone: 自动匹配到角色绑定世界书 [${currentSelection}]`);
+                        }
+                    }
+                }
+            }
+
+            if (currentSelection) {
+                select.value = currentSelection;
+            }
+        },
+
+        closeSettings: function() {
+            const pageContacts = document.getElementById('page-contacts');
+            const pageSettings = document.getElementById('page-settings');
+            
+            pageSettings.classList.add('hidden-right');
+            pageSettings.classList.remove('active');
+            pageContacts.classList.remove('hidden-left');
+            pageContacts.classList.add('active');
+        },
+        
+        saveSettings: function() {
+            const select = document.getElementById('setting-worldbook-select');
+            window.ST_PHONE.config.targetWorldBook = select.value;
+            console.log('📱 ST-iOS-Phone: 存储目标已更新为', select.value);
         }
     };
 
+    // 事件绑定
     document.getElementById('st-phone-icon').addEventListener('click', () => {
         const isOpen = window.ST_PHONE.ui.toggleWindow();
         if(isOpen) document.dispatchEvent(new CustomEvent('st-phone-opened'));
     });
     document.getElementById('btn-back').onclick = window.ST_PHONE.ui.closeChat;
+    
+    // --- 新增：设置页事件绑定 ---
+    document.getElementById('btn-open-settings').onclick = window.ST_PHONE.ui.openSettings;
+    document.getElementById('btn-settings-back').onclick = window.ST_PHONE.ui.closeSettings;
+    document.getElementById('setting-worldbook-select').addEventListener('change', window.ST_PHONE.ui.saveSettings);
+
     document.getElementById('phone-search-bar').addEventListener('input', (e) => {
         const query = e.target.value.toLowerCase().trim();
         const allContacts = window.ST_PHONE.state.contacts;
@@ -368,21 +490,15 @@
     });
     document.getElementById('btn-toggle-stickers').onclick = window.ST_PHONE.ui.toggleStickerPanel;
 
-    // ============================================================
-    // 【核心修复】输入框按键逻辑 (支持 Shift+Enter 换行，阻止自动发送)
-    // ============================================================
+    // 输入框逻辑 (保持不变)
     const msgInput = document.getElementById('msg-input');
     if(msgInput) {
         msgInput.addEventListener('keydown', (e) => { 
-            // 【关键】阻止事件冒泡到酒馆主界面，防止触发酒馆的快捷键（如 Enter 发送）
             e.stopPropagation();
-
             if (e.key === 'Enter') {
                 if (e.shiftKey) {
-                    // Shift+Enter: 允许浏览器默认换行行为
                     return;
                 } else {
-                    // Enter Only: 阻止默认换行，执行发送
                     e.preventDefault();
                     if (e.target.value.trim()) {
                         document.getElementById('btn-send').click(); 
