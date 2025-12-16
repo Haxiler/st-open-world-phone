@@ -1,7 +1,8 @@
 // ==================================================================================
-// 模块: Core (核心逻辑 - v3.2 Lite)
+// 模块: Core (核心逻辑 - v3.3 Lite & Auto-Clear Fix)
 // ==================================================================================
 (function() {
+    // 等待酒馆环境
     const waitForST = setInterval(() => {
         if (typeof SillyTavern !== 'undefined' && SillyTavern.getContext) {
             clearInterval(waitForST);
@@ -33,13 +34,13 @@
         return now;
     }
 
+    // 初始化状态
     window.ST_PHONE.state.lastUserSendTime = 0;
     window.ST_PHONE.state.pendingQueue = []; 
     window.ST_PHONE.state.virtualTime = getSystemTimeStr(); 
     window.ST_PHONE.state.unreadIds = window.ST_PHONE.state.unreadIds || new Set();
 
     let cachedContactsMap = new Map(); 
-    let lastChatLength = 0; 
     let lastXmlMsgCount = -1;
 
     const REGEX_XML_MSG = /<msg>(.+?)\|(.+?)\|([\s\S]+?)\|(.*?)<\/msg>/gi;
@@ -54,6 +55,9 @@
         return myNames.some(n => n && name.toLowerCase() === n.toLowerCase());
     }
 
+    // ----------------------------------------------------------------------
+    // 核心扫描逻辑
+    // ----------------------------------------------------------------------
     function scanChatHistory() {
         if (typeof SillyTavern === 'undefined') return;
         
@@ -66,6 +70,7 @@
         let lastParsedSmsWasMine = false;
         let newContactsMap = new Map();
 
+        // 1. 全量扫描聊天记录
         chat.forEach(msg => {
             if (!msg.mes) return;
             const cleanMsg = msg.mes.replace(/```/g, ''); 
@@ -99,7 +104,7 @@
                     isMyMessage = false;
                 }
                 lastParsedSmsWasMine = isMyMessage;
-                if (isUserSender(contactName, context)) return;
+                if (isUserSender(contactName, context)) return; // 忽略自己发给自己的
 
                 if (!newContactsMap.has(contactName)) {
                     newContactsMap.set(contactName, {
@@ -108,13 +113,14 @@
                 }
                 const contact = newContactsMap.get(contactName);
 
+                // 简单的历史记录去重（防止连续显示相同文本）
                 const lastMsgInHistory = contact.messages[contact.messages.length - 1];
                 if (isMyMessage && lastMsgInHistory && lastMsgInHistory.sender === 'user' && lastMsgInHistory.text === content) return; 
 
                 contact.messages.push({
                     sender: isMyMessage ? 'user' : 'char',
                     text: content,
-                    isPending: false,
+                    isPending: false, // 历史记录里的都不是 pending
                     timeStr: finalTimeStr,
                     timestamp: parsedDate.getTime(),
                     dateStr: dateStr
@@ -125,6 +131,7 @@
             });
         });
 
+        // 2. 更新未读计数
         newContactsMap.forEach((contact, id) => {
             const oldContact = cachedContactsMap.get(id);
             const isCountIncreased = !oldContact || contact.messages.length > oldContact.messages.length;
@@ -139,10 +146,16 @@
         cachedContactsMap = newContactsMap;
         if (latestNarrativeTime) window.ST_PHONE.state.virtualTime = latestNarrativeTime;
 
+        // 3. 变化检测与通知 (含：自动清空 Pending 修复)
         if (lastXmlMsgCount === -1) {
             lastXmlMsgCount = currentXmlMsgCount;
         } else {
             if (currentXmlMsgCount > lastXmlMsgCount) {
+                // 【核心修复】：检测到任何新短信入库，说明之前的发送已成功
+                // 直接清空所有待发送气泡，不做区分
+                window.ST_PHONE.state.pendingQueue = [];
+
+                // 通知音效
                 if (!lastParsedSmsWasMine && !window.ST_PHONE.state.isPhoneOpen) {
                     if (window.ST_PHONE.ui.setNotification) window.ST_PHONE.ui.setNotification(true);
                     if (window.ST_PHONE.ui.playNotificationSound) window.ST_PHONE.ui.playNotificationSound();
@@ -151,6 +164,8 @@
             lastXmlMsgCount = currentXmlMsgCount;
         }
 
+        // 4. 处理 Pending (待发送) 队列
+        // 注意：如果上面清空了队列，这里 queue.length 就是 0，不会渲染重复气泡
         const queue = window.ST_PHONE.state.pendingQueue;
         const now = Date.now();
         const MAX_PENDING_TIME = 600000; 
@@ -158,6 +173,7 @@
         if (queue.length > 0) {
             const activeQueue = queue.filter(pMsg => (now - pMsg.sendTime < MAX_PENDING_TIME));
             window.ST_PHONE.state.pendingQueue = activeQueue; 
+            
             activeQueue.forEach(pMsg => {
                 let contact = newContactsMap.get(pMsg.target);
                 if (!contact) {
@@ -169,15 +185,24 @@
                 const pendingTimeStr = window.ST_PHONE.state.virtualTime;
                 const pendingDate = parseTimeStr(pendingTimeStr);
                 const datePartMatch = pendingTimeStr.match(/(\d+月\d+日)/);
+                
+                // 将 Pending 消息暂存进显示列表
                 contact.messages.push({
-                    sender: 'user', text: pMsg.text, isPending: true, timeStr: pendingTimeStr, timestamp: pendingDate.getTime(), dateStr: datePartMatch ? datePartMatch[1] : ''
+                    sender: 'user', 
+                    text: pMsg.text, 
+                    isPending: true, // 标记为半透明
+                    timeStr: pendingTimeStr, 
+                    timestamp: pendingDate.getTime(), 
+                    dateStr: datePartMatch ? datePartMatch[1] : ''
                 });
                 contact.lastMsg = pMsg.text;
                 contact.lastTimestamp = pendingDate.getTime();
+                // 自己的待发送消息不应触发红点
                 window.ST_PHONE.state.unreadIds.delete(pMsg.target);
             });
         }
 
+        // 5. 排序与UI更新
         let contactList = Array.from(newContactsMap.values());
         contactList.forEach(c => c.hasUnread = window.ST_PHONE.state.unreadIds.has(c.id));
         contactList.sort((a, b) => b.lastTimestamp - a.lastTimestamp);
@@ -185,10 +210,12 @@
 
         if (window.ST_PHONE.ui.updateStatusBarTime) window.ST_PHONE.ui.updateStatusBarTime(window.ST_PHONE.state.virtualTime);
 
+        // 同步世界书
         if (window.ST_PHONE.scribe && typeof window.ST_PHONE.scribe.sync === 'function') {
             try { window.ST_PHONE.scribe.sync(window.ST_PHONE.state.contacts); } catch(e) {}
         }
         
+        // 渲染界面
         if (window.ST_PHONE.ui.renderContacts) {
             const searchInput = document.getElementById('phone-search-bar');
             if (!searchInput || !searchInput.value) window.ST_PHONE.ui.renderContacts();
@@ -204,7 +231,9 @@
         }
     }
 
-    
+    // ----------------------------------------------------------------------
+    // 发送逻辑 (注入输入框 + 自动换行)
+    // ----------------------------------------------------------------------
     async function sendDraftToInput() {
         const input = document.getElementById('msg-input'); 
         const text = input.value.trim();
@@ -216,50 +245,44 @@
         const targetName = contact ? contact.name : activeId;
         const timeToSend = window.ST_PHONE.state.virtualTime;
 
-        // 1. 构造 XML 格式消息
+        // 构造 XML
         const xmlString = `<msg>{{user}}|${targetName}|${text}|${timeToSend}</msg>`;
 
         try {
-            // 2. 注入酒馆主输入框 (追加模式)
             const mainTextArea = document.getElementById('send_textarea');
-            
             if (mainTextArea) {
-                // 获取当前已有的文本
+                // 1. 注入文本 (保留原有内容 + 换行)
                 const currentContent = mainTextArea.value;
-                
-                // 如果原本有内容，先换行再追加；如果是空的，直接填入
-                // 【核心修改】：在 xmlString 后面强制追加一个 '\n'，方便立刻书写后续动作
                 const prefix = currentContent ? '\n' : '';
                 mainTextArea.value = currentContent + prefix + xmlString + '\n';
                 
-                // 触发 input 事件以适配前端框架
+                // 2. 触发事件
                 mainTextArea.dispatchEvent(new Event('input', { bubbles: true }));
                 
-                // 聚焦并确保光标在最后
+                // 3. 聚焦并滚动到底部
                 mainTextArea.focus();
                 mainTextArea.scrollTop = mainTextArea.scrollHeight; 
 
-                // 3. 视觉反馈：保留 Pending 队列，让手机界面显示“发送中”
+                // 4. 添加视觉气泡 (进入 Pending 队列)
                 window.ST_PHONE.state.pendingQueue.push({
-                    text: text,
-                    target: targetName,
-                    sendTime: Date.now()
+                    text: text, target: targetName, sendTime: Date.now()
                 });
                 window.ST_PHONE.state.lastUserSendTime = Date.now();
 
-                // 4. 清空手机输入框并刷新手机界面
+                // 5. 清空手机输入框并刷新
                 input.value = '';
                 scanChatHistory(); 
-                
             } else {
                 console.error('ST Phone: 未找到主输入框 (#send_textarea)');
             }
-
         } catch (e) {
             console.error('ST Phone Send Error:', e);
         }
     }
 
+    // ----------------------------------------------------------------------
+    // 初始化
+    // ----------------------------------------------------------------------
     function initCore() {
         const sendBtn = document.getElementById('btn-send');
         if(sendBtn) sendBtn.onclick = sendDraftToInput;
@@ -274,9 +297,11 @@
                     window.ST_PHONE.state.unreadIds.clear(); 
                     scanChatHistory();
                 });
+                // 各种事件触发扫描
                 eventSource.on('chat_changed', debouncedScan);
                 eventSource.on('generation_ended', debouncedScan);
                 eventSource.on('group_chat_updated', debouncedScan);
+                
                 scanChatHistory();
                 return;
             }
