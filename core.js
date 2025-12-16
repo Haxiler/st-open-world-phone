@@ -208,37 +208,42 @@
         const input = document.getElementById('msg-input'); 
         const text = input.value.trim();
         const activeId = window.ST_PHONE.state.activeContactId;
+        
         if (!text || !activeId) return;
 
         let contact = window.ST_PHONE.state.contacts.find(c => c.id === activeId);
         const targetName = contact ? contact.name : activeId;
         const timeToSend = window.ST_PHONE.state.virtualTime;
+
+        // 1. 构造 XML 格式消息
         const xmlString = `<msg>{{user}}|${targetName}|${text}|${timeToSend}</msg>`;
 
         try {
-            const context = SillyTavern.getContext();
-            const currentChat = context.chat;
-            const newMessage = {
-                name: context.name1, is_user: true, is_system: false, send_date: getSystemTimeStr(), mes: xmlString, extra: {} 
-            };
-            currentChat.push(newMessage);
+            // 2. 注入酒馆主输入框 (核心修改)
+            const mainTextArea = document.getElementById('send_textarea');
             
-            if (SillyTavern.saveChat) await SillyTavern.saveChat();
-            else if (context.saveChat) await context.saveChat();
+            if (mainTextArea) {
+                mainTextArea.value = xmlString;
+                // 触发 input 事件以适配前端框架
+                mainTextArea.dispatchEvent(new Event('input', { bubbles: true }));
+                mainTextArea.focus();
 
-            if (SillyTavern.generate) SillyTavern.generate(); 
-            else {
-                const generateBtn = document.getElementById('send_textarea'); 
-                if(typeof eventSource !== 'undefined') {
-                    eventSource.emit('chat_changed');
-                    const realSendBtn = document.getElementById('send_but');
-                    if(realSendBtn) realSendBtn.click();
-                }
+                // 3. 【已恢复】保留 Pending 队列逻辑，确保手机界面显示“发送中”气泡
+                window.ST_PHONE.state.pendingQueue.push({
+                    text: text,
+                    target: targetName,
+                    sendTime: Date.now()
+                });
+                window.ST_PHONE.state.lastUserSendTime = Date.now();
+
+                // 4. 清空手机输入框并刷新手机界面
+                input.value = '';
+                scanChatHistory(); 
+                
+            } else {
+                console.error('ST Phone: 未找到主输入框 (#send_textarea)');
             }
-            window.ST_PHONE.state.pendingQueue.push({ text: text, target: targetName, sendTime: Date.now() });
-            window.ST_PHONE.state.lastUserSendTime = Date.now();
-            input.value = '';
-            scanChatHistory();
+
         } catch (e) {
             console.error('ST Phone Send Error:', e);
         }
