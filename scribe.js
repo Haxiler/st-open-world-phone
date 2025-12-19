@@ -1,9 +1,8 @@
 // ==================================================================================
-// 模块: Scribe (书记员 - v3.95 Lite - Custom Modified)
+// 模块: Scribe (书记员 - v4.0 Final Fix)
 // ==================================================================================
 (function () {
-    // 【修改点1】将最大条数限制改为 20 (针对每个角色)
-    const MAX_MESSAGES = 20;
+    const MAX_MESSAGES = 20; // 这里的 20 是针对每个角色单独切片的
     const state = { debounceTimer: null };
 
     function buildContent(contact) {
@@ -96,36 +95,49 @@
 
             let existingEntry = entryList.find(e => e.comment === comment);
 
+            // 构造新的配置对象 (包含 extensions)
+            const extensionConfig = {
+                depth: 3,
+                prevent_recursion: true,
+                exclude_recursion: true 
+            };
+
             if (!existingEntry) {
                 const newEntry = createEntry(contact.name, comment, content);
                 if (isDict) bookObj.entries[newEntry.uid] = newEntry;
                 else bookObj.entries.push(newEntry);
                 modified = true;
             } else {
-                // 检查内容更新
                 if (existingEntry.content !== content) {
                     existingEntry.content = content;
                     existingEntry.enabled = true;
                     modified = true;
                 }
                 
-                // 【额外逻辑】强制更新现有条目的属性，以符合新的设定
-                // 1. 深度修正为 3
-                if (existingEntry.depth !== 3) {
-                    existingEntry.depth = 3;
+                // 强制修正旧条目属性
+                // 1. 根属性修正
+                if (existingEntry.depth !== 3) { existingEntry.depth = 3; modified = true; }
+                if (existingEntry.preventRecursion !== true) { existingEntry.preventRecursion = true; modified = true; }
+                
+                // 2. Extensions 属性修正 (关键修复)
+                if (!existingEntry.extensions) {
+                    existingEntry.extensions = extensionConfig;
                     modified = true;
+                } else {
+                    if (existingEntry.extensions.depth !== 3) { 
+                        existingEntry.extensions.depth = 3; 
+                        modified = true; 
+                    }
+                    if (existingEntry.extensions.prevent_recursion !== true) { 
+                        existingEntry.extensions.prevent_recursion = true; 
+                        modified = true; 
+                    }
                 }
-                // 2. 强制开启防止递归
-                if (existingEntry.preventRecursion !== true) {
-                    existingEntry.preventRecursion = true;
-                    modified = true;
-                }
-                // 3. 修正触发词 (仅保留名字)
-                // 注意：这会覆盖用户手动修改的触发词，但符合你的“删除其他”要求
+
+                // 3. 触发词修正
                 const targetKeysStr = JSON.stringify([contact.name]);
                 const currentKeysStr = JSON.stringify(existingEntry.keys || []);
-                // 简单对比数组内容（假设顺序一致或单元素）
-                if (currentKeysStr !== targetKeysStr && (!existingEntry.keys || existingEntry.keys.length !== 1 || existingEntry.keys[0] !== contact.name)) {
+                if (currentKeysStr !== targetKeysStr) {
                     existingEntry.key = [contact.name];
                     existingEntry.keys = [contact.name];
                     modified = true;
@@ -153,7 +165,6 @@
     function createEntry(contactName, comment, content) {
         return {
             uid: generateUUID(), 
-            // 【修改点2】触发词仅保留 contactName
             key: [contactName], 
             keys: [contactName],
             comment: comment,
@@ -161,8 +172,19 @@
             enabled: true,
             constant: false,
             selectiveLogic: 0,
-            depth:3, 
+            
+            // 根属性设定
+            depth: 3, 
             preventRecursion: true,
+
+            // 【关键修复】显式添加 extensions 对象
+            // 很多版本的酒馆优先读取这里的配置
+            extensions: {
+                depth: 3,
+                prevent_recursion: true,
+                exclude_recursion: true // 兼容不同字段名
+            },
+
             order: 100, 
             priority: 100
         };
