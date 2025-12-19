@@ -161,9 +161,7 @@
             enabled: true,
             constant: false,
             selectiveLogic: 0,
-            // 【修改点3】深度改为 3
-            depth: 3, 
-            // 【修改点4】防止进一步递归
+            depth:3, 
             preventRecursion: true,
             order: 100, 
             priority: 100
