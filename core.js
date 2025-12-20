@@ -1,16 +1,27 @@
 // ==================================================================================
-// 模块: Core (核心逻辑 - v3.5 MutationObserver版)
+// 模块: Core (核心逻辑 - v3.6 Robust & Logging)
 // ==================================================================================
 (function() {
-    // 1. 基础环境等待
+    // 1. 更稳健的启动检测：必须同时等待 SillyTavern 上下文 和 #chat 容器
+    let retryCount = 0;
     const waitForST = setInterval(() => {
-        if (typeof SillyTavern !== 'undefined' && SillyTavern.getContext && document.getElementById('chat')) {
+        retryCount++;
+        const hasST = typeof SillyTavern !== 'undefined' && SillyTavern.getContext;
+        const hasChat = document.getElementById('chat');
+        
+        if (hasST && hasChat) {
             clearInterval(waitForST);
+            console.log(`%c📱 ST-iOS-Phone: 核心已挂载 (重试次数: ${retryCount})`, "color: green; font-weight: bold;");
             initCore();
+        }
+        // 如果等了太久(30秒)，强制启动轮询保底
+        if (retryCount > 300) {
+            clearInterval(waitForST);
+            console.warn('ST-Phone: 等待超时，强制启动轮询模式');
+            setInterval(scanChatHistory, 2000);
         }
     }, 100);
 
-    // 2. 工具函数
     function getSystemTimeStr() {
         const now = new Date();
         const M = now.getMonth() + 1;
@@ -62,7 +73,6 @@
     function scanChatHistory() {
         if (typeof SillyTavern === 'undefined') return;
         
-        // 增加 Try-Catch 防止扫描报错导致中断
         try {
             const context = SillyTavern.getContext();
             const chat = context.chat; 
@@ -205,7 +215,6 @@
 
             if (window.ST_PHONE.ui.updateStatusBarTime) window.ST_PHONE.ui.updateStatusBarTime(window.ST_PHONE.state.virtualTime);
 
-            // 【关键】触发世界书同步
             if (window.ST_PHONE.scribe && typeof window.ST_PHONE.scribe.sync === 'function') {
                 try { window.ST_PHONE.scribe.sync(window.ST_PHONE.state.contacts); } catch(e) {}
             }
@@ -269,31 +278,33 @@
     }
 
     // ----------------------------------------------------------------------
-    // 初始化 (使用 MutationObserver 替代 eventSource)
+    // 初始化 (MutationObserver 模式)
     // ----------------------------------------------------------------------
     function initCore() {
         const sendBtn = document.getElementById('btn-send');
         if(sendBtn) sendBtn.onclick = sendDraftToInput;
 
-        // 立即执行一次
-        scanChatHistory();
+        scanChatHistory(); // 立即执行一次
 
-        // 核心修复：监听 #chat 节点的 DOM 变化
-        // 任何消息生成、编辑、删除都会触发子节点变动
         const chatContainer = document.getElementById('chat');
         if (chatContainer) {
-            const observer = new MutationObserver(debounce(() => {
+            // 防抖：200ms
+            const debouncedScan = debounce(() => {
+                // 如果您在控制台看到这个 🔍，说明监听器正在正常工作！
+                console.log('ST-Phone: 🔍 检测到消息变动，正在扫描...'); 
                 scanChatHistory();
-            }, 200)); // 200ms 防抖
+            }, 200);
+
+            const observer = new MutationObserver(debouncedScan);
             
             observer.observe(chatContainer, { 
-                childList: true, // 监听子元素增删 (新消息)
-                subtree: true,   // 监听所有后代
-                characterData: true // 监听文字内容修改
+                childList: true, // 监听新气泡
+                subtree: true,   // 监听内部变化
+                characterData: true // 监听文字编辑
             });
-            console.log('📱 ST-iOS-Phone: 核心监听器已启动 (Observer Mode)');
+            console.log('📱 ST-iOS-Phone: 监听器已启动 (Target: #chat)');
         } else {
-            console.warn('ST-Phone: 未找到 #chat 容器，降级为轮询模式');
+            console.warn('ST-Phone: 异常！初始化时有 #chat 但现在找不到了？降级为轮询');
             setInterval(scanChatHistory, 2000);
         }
     }
